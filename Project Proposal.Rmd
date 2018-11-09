@@ -19,8 +19,14 @@ library("ggplot2")
 library("broom")
 library("knitr")
 ```
+
 ## Introduction
+
 ## Data
+```{r}
+data <- read.csv("./redwine_quality.csv")
+```
+
 ## Analysis
 ## Reference
 ## Appendix
