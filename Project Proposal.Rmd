@@ -19,7 +19,11 @@ library("ggplot2")
 library("broom")
 library("knitr")
 ```
-
+## Introduction
+## Data
+## Analysis
+## Reference
+## Appendix
 
 <!-- Label each question and question part (if applicable) clearly using R Markdown syntax. -->
 
