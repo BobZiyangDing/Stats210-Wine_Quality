@@ -1,0 +1,27 @@
+---
+title: "Project Proposal"
+author: "Bob Ding, Lynn Fan, Alice Jiang"
+date: "11/08/2018"
+output: html_document
+---
+
+```{r setup, message=F,include=F}
+knitr::opts_chunk$set(echo = TRUE)
+options(knitr.kable.NA = '')
+```
+
+```{r}
+#Include the libraries needed to complete the assignment.
+library("cowplot")
+library("tibble")
+library("dplyr")
+library("ggplot2")
+library("broom")
+library("knitr")
+```
+
+
+<!-- Label each question and question part (if applicable) clearly using R Markdown syntax. -->
+
+
+
