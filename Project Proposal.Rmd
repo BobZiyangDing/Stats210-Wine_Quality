@@ -18,6 +18,8 @@ library("dplyr")
 library("ggplot2")
 library("broom")
 library("knitr")
+wine <- read.csv("https://github.com/BobZiyangDing/Stats210-Wine_Quality/redwine_quality.csv")
+      
 ```
 
 ## Introduction
