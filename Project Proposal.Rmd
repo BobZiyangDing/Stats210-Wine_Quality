@@ -11,15 +11,12 @@ options(knitr.kable.NA = '')
 ```
 
 ```{r}
-#Include the libraries needed to complete the assignment.
 library("cowplot")
 library("tibble")
 library("dplyr")
 library("ggplot2")
 library("broom")
 library("knitr")
-wine <- read.csv("https://github.com/BobZiyangDing/Stats210-Wine_Quality/redwine_quality.csv")
-      
 ```
 
 ## Introduction
@@ -27,7 +24,27 @@ wine <- read.csv("https://github.com/BobZiyangDing/Stats210-Wine_Quality/redwine
 ## Data
 ```{r}
 data <- read.csv("./redwine_quality.csv")
+glimpse(data)
 ```
+The data has 12 variables:
+
+
+###**Response Variable:**
+  + **quality**: the quality of the wine
+  
+###**Explanatory Variables:**
+  + **fixed acidity**: the amount of acid in wine that's not volatile
+  + **volatile acidity**: the amount of acid in wine that's volatile
+  + **citric acid**: the quantity of citric acid, which add freshness flavor to wine
+  + **residual sugar**: the amount of sugar left after fermatation stops
+  + **chlorides**: the amount of salt in the wine
+  + **free sulfure dioxide**: the free form of SO2 exists in equilibrium between molecular SO2 (as a dissolved gas) and bisulfite ion
+  + **total sulfur dioxide**: amount of free and bound forms of S02
+  + **density**: the density, which is related to proportion of water and other solvent.
+  + **pH**: the indicator showing the acidicity or basic property. ranging from 0 to 14.
+  + **sulphates**: a wine additive which can contribute to sulfur dioxide gas (S02) levels
+  + **alcohol**: percent of alcohol
+
 
 ## Analysis
 ## Reference
