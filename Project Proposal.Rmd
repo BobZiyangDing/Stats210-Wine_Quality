@@ -20,6 +20,11 @@ library("knitr")
 ```
 
 ## Introduction
+Project goal: **Explanation** 
+Identify variables that are important in explaining variation in response.
+
+We are interested in researching **what factors contribute to the quality of wine** for different types of red vinho verde from Portugal. This data set was used to predict quality of wine for future wine certification, complementary to human wine tasters, in the paper we cited (Modeling wine preferences by data mining from physicochemical properties). We believe that this dataset can also be used to analyze what chemical factors are attributable the final rating of wine (as demonstrated by variable quality). If we know how chemical factors affect the quality of wine, it may be helpful for improving/preserving wine quality with chemical methods in the future.
+In this modeling process, we will **try to include all variables** that might be related to the response variable (quality) as we start, even if they are not statistically significant. By doing so, we can maximize the fitness of this model and interpret each chemical factor by its statistical coefficient. At the end, we will produce a regression model that best explain how the chemical compositions of different types of wine determines their variation in quality.
 
 ## Data
 ```{r}
@@ -62,7 +67,51 @@ The data has 12 variables, most of the varialbles are pretty normally distribute
 
 
 ## Analysis
+
+In our data set, the response variable quality is an ordinal data with a scale of 0 to 10. For modeling purposes, we will make quality an integer variable in R Studio. We will investigate 11 explanatory variables to understand their main effect and interaction effect on the wine quality (response variable). 
+
+Our main objective of the study is to understand which explanatory variables play a significant influence on the quality of the wine. 
+
+Our current hypothesis is that:
+
+Proposed methods:
+
+**Data Exploration**
+
+* Plot the relationships of each explanatory variable vs. the response variable quality and all other explanatory variables so that we can have a rough idea of variables' relationships, identify outliers, and needs for data transformation.
+
+* Based on the findings from the plots, we will focus on strong linear/non-linear relationships/significant multicollinearity detected. Through inspection of variable definitions, we believe free sulphur dioxide could be directly related to total sulphur dioxide, which is one potential multicollinearity we will test on. A comprehensive test of strong correlation/multicollinearity will be conducted on other explanatory variables as well.
+* Analyze the distribution of each variables, specifically histogram and summary statistics of mean, median, and standard deviation for numerical data types, to further inspect for missing value, outliers, and potential data transformation.
+* Given our response variable (quality) is a categorical variable, we might transform it from an integer type to a factor variable. We can then create a bar graph and calculate the number of observations in each quality rating using the group_by() and summarise() functions. This analysis of the distribution of quality can then help us determine the most appropriate reference level.
+
+**Regression Analysis**
+
+* Conduct linear regression models using explanatory variables and the response variable after adjusting for any findings in the Data Exploration stage (e.g. add a new variable for data transformation).
+* We will use a stepwise model selection to choose variables for the model, including only main effects.
+* We might also conduct model selection using forward and backward procedure, depending on the explanatory variables included in the previous model selection, and compare their differences
+* After deciding on the model, we will conduct Nested F tests to determine any significant interaction effects among the explanatory variables. For example, density, residual sugar, density, alcohol, according to variable definitions.
+* Create a final model based on previous results.
+* Check for model fit (i.e. R2value)
+
+**Assumptions**
+
+* Check if the final linear regression model meets the assumptions for regression: linearity, constant variance, independence and normality using standardized residual plots, histogram (distribution of residuals), and QQ-plot.
+* Try to improve the model if certain assumptions are not met.
+* Check for potential influence points and see how they might affect the model fit. We will test for leverage and Cook's Distance and draw conclusions along with the standardized residual plots. 
+* Calculate multicollinearity using the vif() function.
+
+**Conclusion**
+
+* After finalizing our model and making sure it meets all assumptions, we will draw the final conclusion on our research interest, and identify factors influencing the wine quality.
+
+
 ## Reference
+
+https://www.kaggle.com/uciml/red-wine-quality-cortez-et-al-2009
+
+https://ac.els-cdn.com/S0167923609001377/1-s2.0-S0167923609001377-main.pdf?_tid=949194e4-fb5f-4ecc-8572-25fb69b53955&acdnat=1541795552_dd074c301f5165bdbe4ba634ffcd1534
+
+
 ## Appendix
 
 <!-- Label each question and question part (if applicable) clearly using R Markdown syntax. -->
