@@ -2,7 +2,9 @@
 title: "Project Proposal"
 author: "Bob Ding, Lynn Fan, Alice Jiang"
 date: "11/08/2018"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, message=F,include=F}
