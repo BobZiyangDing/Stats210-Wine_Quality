@@ -2,9 +2,7 @@
 title: "Project Proposal"
 author: "Bob Ding, Lynn Fan, Alice Jiang"
 date: "11/08/2018"
-output:
-  pdf_document: default
-  html_document: default
+output: html_document
 ---
 
 ```{r setup, message=F,include=F}
@@ -22,57 +20,73 @@ library("knitr")
 ```
 
 ## Introduction
-Project goal: **Explanation** 
+**Project Goal: Explanation**  
 To identify variables that are important in explaining variation in the response.
 
-We are interested in researching **what factors contribute to the quality of wine** for different types of red vinho verde from Portugal. This data set was used to predict quality of wine for future wine certification, complementary to human wine tasters, in the paper we cited (Modeling wine preferences by data mining from physicochemical properties). We believe that this dataset can also be used to analyze what chemical factors are attributable the final rating of wine (as demonstrated by variable quality). If we know how chemical factors affect the quality of wine, it may be helpful for improving/preserving wine quality with chemical methods in the future.
-In this modeling process, we will **try to include all variables** that might be related to the response variable (quality) as we start, even if they are not statistically significant. By doing so, we can maximize the fitness of this model and interpret each chemical factor by its statistical coefficient. At the end, we will produce a regression model that best explain how the chemical compositions of different types of wine determines their variation in quality.
+We are interested in researching **what factors contribute to the quality of wine** for different types of red vinho verde from Portugal. This data set was used to predict quality of wine for future wine certification, complementary to human wine tasters, in the paper we cited (*Modeling wine preferences by data mining from physicochemical properties*). We believe that this dataset can also be used to analyze what chemical factors are attributable to the final rating of wine (measured by the variable quality). If we can understand how chemical factors affect the wine quality, it may shed light on future R&D directions for chemical methods that could improve/preserve wine quality.
+
+In the beginning stage of the modeling process, we will **try to include all variables** that might be related to the response variable (quality), even if they are not statistically significant. By doing so, we can maximize the fitness of this model. We would also like to **mean-center** all numerical explanatory variables to obtain more meaningful interpretation of each chemical factor by its statistical coefficient. At the end, we will produce a regression model that best explains how different chemical compositions of the wine (red vinho verde) determines the variation in wine quality.
 
 ## Data
 ```{r}
+# input data source
 data <- read.csv("./redwine_quality.csv")
+```
+
+```{r}
+# overview of the dataset
+glimpse(data)
+```
+
+There are 1,599 observations and 12 variables in this dataset.
+
+```{r}
+# summary statistics of each variable
 summary(data)
-p1  <- ggplot(data = data, aes(x = quality) ) +  geom_histogram( fill= "lightblue") 
+```
+
+```{r}
+p1  <- ggplot(data = data, aes(x = quality) ) + geom_histogram( fill= "lightblue") 
 p2  <- ggplot(data = data, aes(x = fixed.acidity) ) + geom_histogram(fill= "lightblue") 
-p3  <- ggplot(data = data, aes(x = volatile.acidity) ) + geom_histogram(fill= "lightblue")
-p4  <- ggplot(data = data, aes(x = citric.acid) ) + geom_histogram(fill= "lightblue")
+p3  <- ggplot(data = data, aes(x = volatile.acidity) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p4  <- ggplot(data = data, aes(x = citric.acid) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
 p5  <- ggplot(data = data, aes(x = residual.sugar) ) + geom_histogram(fill= "lightblue")
-p6  <- ggplot(data = data, aes(x = chlorides) ) + geom_histogram(fill= "lightblue")
-p7  <- ggplot(data = data, aes(x = free.sulfur.dioxide) ) + geom_histogram(fill= "lightblue")
-p8  <- ggplot(data = data, aes(x = total.sulfur.dioxide) ) + geom_histogram(fill= "lightblue")
-p9  <- ggplot(data = data, aes(x = density) ) + geom_histogram(fill= "lightblue")
+p6  <- ggplot(data = data, aes(x = chlorides) ) + theme(axis.text=element_text(size=11)) + geom_histogram(fill= "lightblue")
+p7  <- ggplot(data = data, aes(x = free.sulfur.dioxide) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p8  <- ggplot(data = data, aes(x = total.sulfur.dioxide) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p9  <- ggplot(data = data, aes(x = density) ) + theme(axis.text=element_text(size=7.5)) + geom_histogram(fill= "lightblue")
 p10 <- ggplot(data = data, aes(x = pH) ) + geom_histogram(fill= "lightblue")
-p11 <- ggplot(data = data, aes(x = sulphates) ) + geom_histogram(fill= "lightblue")
+p11 <- ggplot(data = data, aes(x = sulphates) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
 p12 <- ggplot(data = data, aes(x = alcohol) ) + geom_histogram(fill= "lightblue")
 
 plot_grid(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,ncol = 4,nrow = 3)
 ```
 
-The data has 12 variables, most of the varialbles are pretty normally distributed. But variables like free.sulfur.dioxide, total.sulfur.dioxide, and alcohol are lightly skewed. Variables are:
+Most of the 12 varialbles are pretty normally distributed. But variables like free.sulfur.dioxide, total.sulfur.dioxide, and alcohol are slightly skewed to the right. 
 
+## Variable Description
 
-###**Response Variable:**
-  + **quality**: the quality of the wine
+### **Response Variable:**  
+* **quality:** the quality of the wine (a score between 0 and 10)
   
-###**Explanatory Variables:**
-  + **fixed.acidity (g(tartaric acid)/dm3)**: the amount of acid in wine that's not volatile
-  + **volatile.acidity(g(acetic acid)/dm3)**: the amount of acid in wine that's volatile
-  + **citric.acid (g/dm3)**: the quantity of citric acid, which add freshness flavor to wine
-  + **residual.sugar (g/dm3)**: the amount of sugar left after fermatation stops
-  + **chlorides (g(sodium chloride)/dm3)**: the amount of salt in the wine
-  + **free.sulfure.dioxide  (mg/dm3)**: the free form of SO2 exists in equilibrium between molecular SO2 (as a dissolved gas) and bisulfite ion
-  + **total.sulfur.dioxide  (mg/dm3)**: amount of free and bound forms of S02
-  + **density (g/cm3)**: the density, which is related to proportion of water and other solvent.
-  + **pH**: the indicator showing the acidicity or basic property. ranging from 0 to 14.
-  + **sulphates (g(potassium sulphate)/dm3)**: a wine additive which can contribute to sulfur dioxide gas (S02) levels
-  + **alcohol (vol.%)**: percent of alcohol
-
+### **Explanatory Variables:**  
+* **fixed.acidity:** $(g(tartaric\ acid)/dm^3)$ the amount of acid in wine that's not volatile (do not evaporate fast) 
+* **volatile.acidity:** $(g(acetic\ acid)/dm^3)$ the amount of acetic acid in wine; at high levels can lead to an unpleasant and vinegar taste in wines
+* **citric.acid:** $(g/dm^3)$ citric acid is found in small quantities, and can add freshness and flavor to wines  
+* **residual.sugar:** $(g/dm^3)$ the amount of sugar left after fermatation stops; generally greater than 1 gram/liter in wines and wines with greater than 45 grams/liter are considered sweet
+* **chlorides:** $(g(sodium\ chloride)/dm^3)$ the amount of salt in the wine 
+* **free.sulfure.dioxide:** $(mg/dm^3)$ the free form of $S0_2$ exists in equilibrium between molecular $S0_2$ (as a dissolved gas) and bisulfite ion  
+* **total.sulfur.dioxide:** $(mg/dm^3)$ amount of free and bound forms of $S0_2$; at free $S0_2$ concentration over 50ppm, $S0_2$ becomes evident in the smell and taste of the wine
+* **density:** $(g/cm^3)$ the density of the liquid, which is close to the density of water  depending on the percent alcohol and sugar content in the wine 
+* **pH:** the indicator of the acidicity or basic property of the wine on a scale from 0 (very acidic) to 14 (very basic)
+* **sulphates:** $(g(potassium\ sulphate)/dm^3)$a wine additive which can contribute to sulfur dioxide gas $S0_2$ levels  
+* **alcohol:** $(vol.%)$ the percent alcohol content of the wine
 
 ## Analysis
 
-In our data set, the response variable quality is an ordinal data with a scale of 0 to 10. For modeling purposes, we will make quality an integer variable in R Studio. We will investigate 11 explanatory variables to understand their main effect and interaction effect on the wine quality (response variable). 
+In our data set, the response variable quality is an ordinal data with a scale of 0 to 10. **Quality** is currently an integer variable in the dataset, but for modeling purposes, we might convert it into factor variable type. We will investigate 11 explanatory variables to understand their main effect and interaction effect on the wine quality (response variable). 
 
-Our main objective of the study is to understand which explanatory variables play a significant influence on the quality of the wine. 
+Our **main objective** of the study is to understand which explanatory variables play a significant influence on the quality of the wine. 
 
 Our current hypothesis is that:
 
