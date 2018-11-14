@@ -23,7 +23,7 @@ library("knitr")
 
 ## Introduction
 Project goal: **Explanation** 
-Identify variables that are important in explaining variation in response.
+To identify variables that are important in explaining variation in the response.
 
 We are interested in researching **what factors contribute to the quality of wine** for different types of red vinho verde from Portugal. This data set was used to predict quality of wine for future wine certification, complementary to human wine tasters, in the paper we cited (Modeling wine preferences by data mining from physicochemical properties). We believe that this dataset can also be used to analyze what chemical factors are attributable the final rating of wine (as demonstrated by variable quality). If we know how chemical factors affect the quality of wine, it may be helpful for improving/preserving wine quality with chemical methods in the future.
 In this modeling process, we will **try to include all variables** that might be related to the response variable (quality) as we start, even if they are not statistically significant. By doing so, we can maximize the fitness of this model and interpret each chemical factor by its statistical coefficient. At the end, we will produce a regression model that best explain how the chemical compositions of different types of wine determines their variation in quality.
@@ -55,17 +55,17 @@ The data has 12 variables, most of the varialbles are pretty normally distribute
   + **quality**: the quality of the wine
   
 ###**Explanatory Variables:**
-  + **fixed.acidity**: the amount of acid in wine that's not volatile
-  + **volatile.acidity**: the amount of acid in wine that's volatile
-  + **citric.acid**: the quantity of citric acid, which add freshness flavor to wine
-  + **residual.sugar**: the amount of sugar left after fermatation stops
-  + **chlorides**: the amount of salt in the wine
-  + **free.sulfure.dioxide**: the free form of SO2 exists in equilibrium between molecular SO2 (as a dissolved gas) and bisulfite ion
-  + **total.sulfur.dioxide**: amount of free and bound forms of S02
-  + **density**: the density, which is related to proportion of water and other solvent.
+  + **fixed.acidity (g(tartaric acid)/dm3)**: the amount of acid in wine that's not volatile
+  + **volatile.acidity(g(acetic acid)/dm3)**: the amount of acid in wine that's volatile
+  + **citric.acid (g/dm3)**: the quantity of citric acid, which add freshness flavor to wine
+  + **residual.sugar (g/dm3)**: the amount of sugar left after fermatation stops
+  + **chlorides (g(sodium chloride)/dm3)**: the amount of salt in the wine
+  + **free.sulfure.dioxide  (mg/dm3)**: the free form of SO2 exists in equilibrium between molecular SO2 (as a dissolved gas) and bisulfite ion
+  + **total.sulfur.dioxide  (mg/dm3)**: amount of free and bound forms of S02
+  + **density (g/cm3)**: the density, which is related to proportion of water and other solvent.
   + **pH**: the indicator showing the acidicity or basic property. ranging from 0 to 14.
-  + **sulphates**: a wine additive which can contribute to sulfur dioxide gas (S02) levels
-  + **alcohol**: percent of alcohol
+  + **sulphates (g(potassium sulphate)/dm3)**: a wine additive which can contribute to sulfur dioxide gas (S02) levels
+  + **alcohol (vol.%)**: percent of alcohol
 
 
 ## Analysis
