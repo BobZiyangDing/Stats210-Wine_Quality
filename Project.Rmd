@@ -119,7 +119,93 @@ data <- data %>%
 ```
 
 # Regression Analysis
+## Lynn Simple Regression Model
+```{r}
+#Primary Model
+data <- data %>%
+  mutate(quality = as.numeric(quality))
+full.model.l <- lm(quality ~ volatile.acidityCent + residual.sugarCent + citric.acid + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + densityCent + pHCent + alcoholCent, data=data)
+tidy(full.model.l)
+```
+This is the primary model we construct based on the previous exploratory analysis on the collinearity we discovered. Then, we will use step-wise model selection process, only including the main effects first.
 
+```{r}
+#Backward selection process
+backward <- ols_step_backward_aic(full.model.l,details=TRUE)
+plot(backward)
+selected1 <- lm(quality ~ volatile.acidityCent + citric.acid + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + densityCent + pHCent + alcoholCent, data=data)
+``` 
+We first use backward selection process to determine which variables to be included. In this first step, only residual.sugarCent in the primary model (full.model) is not selected. 
+
+```{r}
+#Forward selection process
+forward <- ols_step_forward_aic(selected1,details=TRUE)
+plot(forward)
+```
+we then use forward selection process to examine the model selected by the backward process. All of the variables in the backward model are also included by the forward model.
+
+```{r}
+#Stepwise selection process
+stepwise <- ols_step_both_aic(selected1,details=TRUE)
+plot(stepwise)
+``` 
+From all three model selection process, all variables except residual.sugarCent in the primary model (full.model) are selected. 
+
+```{r}
+kable(tidy(selected1))
+tidy(vif(selected1))
+```
+As we look through the variables, we found densityCent and pHCent with p-values larger than the threshold of 0.05. Therefore we consider them to be statistically insigficant and remove the two variables from the model. We also use VIF() function to see if possible multicollinearity can be detected. As all of the vif values are smaller than 5, no notable multicollinearity is detected.
+
+```{r}
+selected2 <-  lm(quality ~ volatile.acidityCent + citric.acid + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + alcoholCent, data=data)
+kable(tidy(selected2))
+tidy(vif(selected2))
+``` 
+In this new model, we detect a new varaible: citric acid, with a p-value larger than 0.05. We also remove it from the model. 
+```{r}
+selected3 <-  lm(quality ~ volatile.acidityCent + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + alcoholCent, data=data)
+kable(tidy(selected3))
+tidy(vif(selected3))
+``` 
+No p-values are larger than 0.05. We then proceed to examine possible interaction between these five variables.
+
+### Nested F Tests On Interactions
+```{r}
+#use nested F tests to see if there are any significant interactions
+selected <-  lm(quality ~ volatile.acidityCent + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + alcoholCent, data=data)
+model_va <- lm(quality ~ volatile.acidityCent + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + alcoholCent + volatile.acidityCent*chloridesCent + volatile.acidityCent*free.sulfur.dioxideCent + volatile.acidityCent*sulphatesCent + volatile.acidityCent*alcoholCent,data=data)
+ano1 <- anova(model_va,selected)
+kable(tidy(ano1))
+model_cl <- lm(quality~ volatile.acidityCent + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + alcoholCent + chloridesCent*free.sulfur.dioxideCent + chloridesCent*sulphatesCent + chloridesCent*alcoholCent +free.sulfur.dioxideCent*sulphatesCent + free.sulfur.dioxideCent*alcoholCent + sulphatesCent*alcoholCent, data=data)
+ano2 <- anova(model_cl,selected)
+kable(tidy(ano2))
+```
+From these two tests, we found that the interactions of volatile.acidityCent with other variables are not significant while some of other interactions are. We then investigate which specific interactions are significant with backward model selection process.
+
+```{r}
+backward_2 <- ols_step_backward_aic(model_cl,details=TRUE)
+plot(backward_2)
+model_inter1 <- lm(quality~ volatile.acidityCent + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + alcoholCent + chloridesCent*sulphatesCent + chloridesCent*alcoholCent +free.sulfur.dioxideCent*sulphatesCent + free.sulfur.dioxideCent*alcoholCent + sulphatesCent*alcoholCent, data=data)
+```
+
+```{r}
+ano3 <-anova(model_inter1,model_cl)
+kable(tidy(ano3))
+``` 
+No more significant interaction found.
+
+```{r}
+summary(model_inter1)
+``` 
+Among the interaction terms, we found chloridesCent*alcoholCent and sulphatesCent*alcoholCent with p-values higher than 0.05. Therefore, we consider them statistically insignificant and remove them from the model. 
+
+```{r}
+model_linear <- lm(quality~ volatile.acidityCent + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + alcoholCent + chloridesCent*sulphatesCent + free.sulfur.dioxideCent*sulphatesCent + free.sulfur.dioxideCent*alcoholCent, data=data)
+summary(model_linear)
+```
+This is the final model we have for linear regression of quality against the explanatory variables.
+<br /> quality = 0.543 - 0.551*volatile.acidityCent - 0.127*chloridesCent - 0.00192*free.sulfur.dioxideCent + 0.527*sulphatesCent + 0.172*alcoholCent - 1.46* chloridesCent*sulphatesCent - 0.0174* free.sulfur.dioxideCent*sulphatesCent + 0.00369* free.sulfur.dioxideCent*alcoholCent.
 
 # Bob Logistic Regression
 
