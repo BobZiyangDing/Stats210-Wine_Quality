@@ -13,6 +13,10 @@ library("dplyr")
 library("ggplot2")
 library("broom")
 library("knitr")
+library("arm") 
+library("readr")
+library("car")
+library("pROC")
 ```
 
 # Data Exploration
@@ -116,6 +120,85 @@ data <- data %>%
 
 # Regression Analysis
 
+
+# Bob Logistic Regression
+
+
 ```{r}
-lm(quality ~ volatile.acidityCent + residual.sugarCent + citric.acid + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + densityCent + pHCent alcoholCent, data=data)
+rawdata <- read.csv("./redwine_quality.csv")
+data$quality <- rawdata$quality
+data$quality[data$quality < 6] <- 0
+data$quality[data$quality >= 6] <- 1
+
+# Model Reduced
+modellg1.null <- glm(quality ~ 1, data=data , family=binomial) 
+
+# Model Full
+modellg1.full <- glm(quality ~ volatile.acidityCent  + residual.sugarCent + citric.acid + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + densityCent + pHCent + alcoholCent,data=data, family = binomial)
 ```
+
+```{r}
+# forward Selection
+step(modellg1.null,scope=list(upper=modellg1.full),direction="forward")
+```
+
+```{r}
+modellg1.selected <- glm(quality ~ alcoholCent  + volatile.acidityCent + sulphatesCent + chloridesCent + free.sulfur.dioxideCent + citric.acid + pHCent + densityCent,data=data, family = binomial)
+summary(modellg1.selected)
+kable(tidy(modellg1.selected))
+```
+
+```{r}
+modellg1.final <- glm(quality ~ alcoholCent  + volatile.acidityCent + sulphatesCent + chloridesCent + free.sulfur.dioxideCent + citric.acid,data=data, family = binomial)
+summary(modellg1.final)
+kable(tidy(modellg1.final))
+```
+
+```{r}
+kable(tidy(vif(modellg1.final)))
+```
+
+```{r}
+data$pred <- predict.glm(modellg1.final)
+data$res <- residuals.glm(modellg1.final)
+```
+
+```{r,fig.height=4,fig.width=4,echo=F}
+binnedplot(x=data$pred,y=data$res,xlab="Predict")
+binnedplot(x=data$alcoholCent,y=data$res,xlab="alcoholCent")
+binnedplot(x=data$volatile.acidityCent,y=data$res,xlab="volatile.acidityCent")
+binnedplot(x=data$sulphatesCent,y=data$res,xlab="sulphatesCent")
+binnedplot(x=data$chloridesCent,y=data$res,xlab="chloridesCent")
+binnedplot(x=data$free.sulfur.dioxideCent,y=data$res,xlab="free.sulfur.dioxideCent")
+binnedplot(x=data$citric.acid,y=data$res,xlab="citric.acid")
+```
+
+sulfates cent need transformation
+volatile.acidityCent also needs tranformation
+alcoholCent also needs transformation
+
+```{r}
+avPlots(modellg1.final)
+cutoff <- cooks.distance(modellg1.final)
+plot(modellg1.final, which=4, cook.levels=cutoff)
+influencePlot(modellg1.final,	 main="Influence Plot", sub="Circle size is proportial to Cook's Distance" )
+
+data <- data %>%
+  mutate(leverage = hatvalues(modellg1.final), 
+         cooks = cooks.distance(modellg1.final),
+         stand.resid = rstandard(modellg1.final), 
+         obs.num = row_number())
+p3 <- ggplot(data=data, aes(x=obs.num,y=leverage)) + 
+  geom_point(alpha=0.5) + 
+  geom_hline(yintercept=0.1,color="red")+
+  labs(x="Observation Number",y="Leverage",title="Leverage")
+
+p4 <- ggplot(data=data, aes(x=obs.num,y=cooks)) + 
+  geom_point() + 
+  geom_hline(yintercept=1,color="red")+
+  labs(x="Observation Number",y="Cook's Distance",title="Cook's Distance")
+
+plot_grid(p3,p4,ncol = 2)
+```
+
+no significant outlier or influential plot.
