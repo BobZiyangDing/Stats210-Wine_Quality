@@ -1,0 +1,460 @@
+---
+title: "Project"
+author: "Bob Ding, Lynn Fan, Alice Jiang"
+date: "11/18/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("cowplot")
+library("dplyr")
+library("ggplot2")
+library("broom")
+library("knitr")
+library("readr")
+library("arm")
+library("olsrr")
+library("dplyr")
+library("car")
+library("pROC")
+#library("tibble")
+```
+
+# Data Exploration - Alice
+```{r}
+# input data source
+data <- read.csv("./redwine_quality.csv")
+```
+
+```{r}
+# convert quality into factor variable
+data <- data %>% mutate(quality = as.factor(quality))
+```
+
+```{r}
+# overview of the dataset
+glimpse(data)
+```
+
+```{r}
+# scatter plot matrix one
+pairs(quality ~ fixed.acidity + volatile.acidity + citric.acid + density + residual.sugar + chlorides, data=data)
+``` 
+
+The scatter plot matrix suggests a fairly strong positive linear relationship between fixed.acidity and citric.acid; fixed.acidity and density; and density and residual.sugar. There also appears to be a strong negative linear relationship between volatile.acidity and citric.acid. 
+
+```{r}
+# correlation coefficients for potential multicollinearity
+cor(data$fixed.acidity, data$citric.acid)
+cor(data$fixed.acidity, data$density)
+cor(data$volatile.acidity, data$citric.acid)
+cor(data$density, data$residual.sugar)
+```
+
+The correlation coefficent for fixed.acidity and citric.acid (0.6717034) and the correlation coefficient for fixed.acidity and density (0.6680473) show moderate to strong linear relationship between the variables. To remove potential multicollinearity impact, we **will not include fixed.acidity** in the model.
+
+```{r}
+# scatter plot matrix two
+pairs(quality ~ free.sulfur.dioxide + total.sulfur.dioxide + pH + sulphates + alcohol, data=data)
+```
+
+The scatter plot shows strong positive linear relationship between free.sulfur.dioxide and total.sulfur.dioxide.
+
+```{r}
+# correlation coefficients for potential multicollinearity
+cor(data$free.sulfur.dioxide, data$total.sulfur.dioxide)
+```
+
+The correlation coefficient of 0.6676665 between free.sulfur.dioxide and total.sulfur.dioxide indicates strong positive linear relationship. We also know from the data description that total.sulfur dioxide includes free.sulfur.dioxide - whose concentration level could impact the smell and taste of the wine, thus impacting quality. So it is sufficient to include only one of these two variables in the model, and we **will include free.sulphur.dioxide**.
+
+```{r}
+# distribution of each variable
+p1  <- ggplot(data = data, aes(x = quality) ) + geom_histogram(stat="count",fill= "lightblue") 
+p3  <- ggplot(data = data, aes(x = volatile.acidity) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p4  <- ggplot(data = data, aes(x = citric.acid) ) + theme(axis.text=element_text(size=7)) + geom_histogram(fill= "lightblue")
+p5  <- ggplot(data = data, aes(x = residual.sugar) ) + geom_histogram(fill= "lightblue")
+p6  <- ggplot(data = data, aes(x = chlorides) ) + theme(axis.text=element_text(size=11)) + geom_histogram(fill= "lightblue")
+p7  <- ggplot(data = data, aes(x = free.sulfur.dioxide) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p9  <- ggplot(data = data, aes(x = density) ) + theme(axis.text=element_text(size=7.5)) + geom_histogram(fill= "lightblue")
+p10 <- ggplot(data = data, aes(x = pH) ) + geom_histogram(fill= "lightblue")
+p11 <- ggplot(data = data, aes(x = sulphates) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p12 <- ggplot(data = data, aes(x = alcohol) ) + geom_histogram(fill= "lightblue")
+
+plot_grid(p1,p3,p4,p5,p6,p7,p9,p10,p11,p12,ncol = 4,nrow = 3)
+```
+
+We can see that free.sulfur.dioxide and alcohol have an obvious rightly skewed distribution. residual.sugar, cholorides, and sulphates also have a slightly rightward skewedness. citric.acid at first appears to have a bimodal distribution, but this is because there are some wines with zero citric acid, so we see a spike at 0 in the histogram. Based on the data definition, we know it is possible for wines to have citric acid of 0. ***** The distribution of citric acid is overall fairly symmetric. ***** All other variables: quality, volatile.acidity, density, and pH are unimodal and fairly symmetric.
+
+******sort quality********
+
+```{r}
+# summary statistics of each variable
+summary(data)
+```
+
+From the previous histogram, we can see that quality has a fairly normal distribution. The summary statistic also shows that quality rating of 5 has the most number of observations (it is also the middle rating on the scale of 0-10). So quality rating of 5 is the most appropriate **reference level** for the model.
+
+```{r}
+# makes quality==5 the reference level
+data <- data %>% mutate(quality = relevel(quality, ref=5))
+```
+
+```{r}
+# distribution of citric acid
+ggplot(aes(x=citric.acid), data=data) + 
+  geom_histogram(fill="steelblue2", color="black") + 
+  ggtitle("Distribution of Citric Acid") + 
+  theme(plot.title=element_text(color="black", size=14, face="bold.italic", hjust=0.5))
+```
+
+```{r}
+# add mean-centered numerical variables besides citric.acid
+data <- data %>% 
+  mutate(volatile.acidityCent = volatile.acidity-mean(volatile.acidity), 
+         residual.sugarCent = residual.sugar-mean(residual.sugar), 
+         chloridesCent = chlorides-mean(chlorides), 
+         free.sulfur.dioxideCent = free.sulfur.dioxide-mean(free.sulfur.dioxide), 
+         sulphatesCent = sulphates-mean(sulphates), 
+         densityCent = density-mean(density), pHCent = pH-mean(pH),   
+         alcoholCent = alcohol-mean(alcohol))
+```
+
+# Multiple Regression Analysis
+## Lynn 
+```{r}
+# change quality into a numerical variable
+data <- data %>% mutate(quality = as.numeric(quality))
+```
+
+```{r}
+# primary model
+full.model <- lm(quality ~ volatile.acidityCent + residual.sugarCent + citric.acid + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + densityCent + pHCent + alcoholCent, data=data)
+```
+
+```{r}
+# view the primary model
+kable(tidy(full.model), format="markdown")
+# check model fit
+glance(full.model)
+```
+
+This is the primary model we constructed based on the exploratory analysis. We can see that volatile.acidityCent, chloridesCent, and pHCent have p-values greater than 0.05. The model's $R^2$ value 0.0559 is noticeably higher than the Adjusted $R^2$ of 0.0506, penalizing for unnecessary variables in the model. 
+
+We will then use model selection to build a better model, first including only the main effects.
+
+## Model Selections
+```{r}
+# backward selection process
+backward <- ols_step_backward_aic(full.model, details=TRUE)
+```
+
+```{r}
+# view stepwise AIC backward elimination
+plot(backward)
+```
+
+The backward selection removes pHCent and volatile.acidityCent from the model.
+
+```{r}
+# forward selection process
+forward <- ols_step_forward_aic(full.model, details=TRUE)
+```
+
+```{r}
+# view stepwise AIC forward selection
+plot(forward)
+```
+
+We can see the foward selection process includes the same explanatory variables as the model from the backward selection - both models do not include volatile.acidityCent and pHCent from the full.model.
+
+```{r}
+# stepwise selection process
+stepwise <- ols_step_both_aic(full.model, details=TRUE)
+```
+
+```{r}
+# view stepwise AIC two-direction selection
+plot(stepwise)
+``` 
+
+The plot for stepwise selection looks the same as the plot for forward selection. Therefore, for all three model selections, we obtain the same result of including all variables from the full.model, except for volatile.acidityCent and pHCent.
+
+```{r}
+# new model from model selection
+selected <- lm(quality ~ residual.sugarCent + citric.acid + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + densityCent + alcoholCent, data=data)
+```
+
+```{r}
+# view coefficients of the new model
+kable(tidy(selected), format="markdown")
+```
+
+We can see that chloridesCent has a p-value much greater than 0.05, so we consider chloridesCent to be a statistically insignificant predictor and remove it from the model. 
+
+```{r}
+# model after removing chloridesCent
+model <- lm(quality ~ residual.sugarCent + citric.acid + free.sulfur.dioxideCent + sulphatesCent + densityCent + alcoholCent, data=data)
+```
+
+```{r}
+# view the model
+kable(tidy(model), format="markdown")
+```
+
+We can see that the p-values of most of the explanatory variables are smaller than the threshold 0.05, which means there is sufficient evidence that these varaibles are significant predictors of wine quality. There is one exception, which is densityCent, whose p-value of 0.06 is slightly greater than 0.05. We remember that the p-value of densityCent is the selected model that included chloridesCent was 0.45 (already very close to 0.05). We believe 0.06 p-value is a tolerable level and will still keep densityCent in the model, since it helps with fitting the model.
+
+```{r}
+# multicollinearity check
+kable(tidy(vif(model)))
+```
+
+A quick examination of the model using the VIF() function shows no noticeable detection of multicollinearity effects - all vif values are quite small, ranging around 1 to 2.
+
+We will then examine possible interaction effects between the selected variables.
+
+## Nested F Tests on Interactions
+```{r}
+# interaction effects with residual.sugarCent
+model_rs <- lm(quality ~ residual.sugarCent + citric.acid + free.sulfur.dioxideCent + sulphatesCent + densityCent + alcoholCent + residual.sugarCent*citric.acid + residual.sugarCent*free.sulfur.dioxideCent + residual.sugarCent*sulphatesCent + residual.sugarCent*densityCent + residual.sugarCent*alcoholCent, data=data)
+```
+
+```{r}
+# Nested F Test for interaction with residual.sugarCent
+ano1 <- anova(model_rs, model)
+kable(tidy(ano1))
+```
+
+p-value is much higher than 0.05, so there is no significant interactions with residual.sugarCent that impact wine quality.
+
+```{r}
+# Nested F Test for interaction effect between alcohol and density
+model_da <- lm(quality ~ residual.sugarCent + citric.acid + free.sulfur.dioxideCent + sulphatesCent + densityCent + alcoholCent + alcoholCent*densityCent, data=data)
+ano2 <- anova(model_da, model)
+kable(tidy(ano2))
+```
+
+p-value is much larger than 0.05, so there is no significant interaction effect between alcoholCent an densityCent. 
+
+```{r}
+# Nested F Test for all other two-way interactions
+model1 <- lm(quality ~ residual.sugarCent + citric.acid + free.sulfur.dioxideCent + sulphatesCent + densityCent + alcoholCent + citric.acid*free.sulfur.dioxideCent + citric.acid*sulphatesCent + citric.acid*densityCent + citric.acid*alcoholCent + free.sulfur.dioxideCent*sulphatesCent + free.sulfur.dioxideCent*densityCent + free.sulfur.dioxideCent*alcoholCent + sulphatesCent*densityCent + sulphatesCent*alcoholCent, data=data)
+ano3 <- anova(model1, model)
+kable(tidy(ano3))
+```
+
+The p-value is extremely small, so there is at least one significant interaction effects. We will then investigate which specific interactions are significant using backward model selection.
+
+```{r}
+# backward selection
+backward_new <- ols_step_backward_aic(model1, details=TRUE)
+```
+
+```{r}
+# view the stepwise AIC backward elimination
+plot(backward_new)
+```
+
+Backward model selection removes 5 interaction effects and sulphatesCent. However, since the model still includes some interaction effects with sulphatesCent, we will keep this main effect in the model.
+
+```{r}
+# new model after backward selection
+model2 <- lm(quality ~ residual.sugarCent + citric.acid + free.sulfur.dioxideCent + sulphatesCent + densityCent + alcoholCent + citric.acid*free.sulfur.dioxideCent + citric.acid*sulphatesCent + free.sulfur.dioxideCent*alcoholCent + sulphatesCent*alcoholCent, data=data)
+kable(tidy(model2), format="markdown")
+```
+
+We can see that p-value of all the coefficients are less than the threshold of 0.05, except for sulphatesCent. Therefore, these main and interaction effects are significant predictors of wine quality (besides sulphatesCent). So we will make model2 our final model.
+
+```{r}
+# make model2 the final multiple regression model
+final.model <- lm(quality ~ residual.sugarCent + citric.acid + free.sulfur.dioxideCent + sulphatesCent + densityCent + alcoholCent + citric.acid*free.sulfur.dioxideCent + citric.acid*sulphatesCent + free.sulfur.dioxideCent*alcoholCent + sulphatesCent*alcoholCent, data=data)
+```
+
+Our final multiple reression model:  
+$quality = 4.2245 - 0.0512*residual.sugarCent - 0.6498*citric.acid + 0.0204*free.sulfur.dioxideCent - 0.1836*sulphatesCent + 57.4648*densityCent - 0.1355*alcoholCent - 0.0438*citric.acid*free.sulfur.dioxideCent - 1.9995*citric.acid*sulphatesCent + 0.0103*free.sulfur.dioxideCent*alcoholCent - 1.3477*sulphatesCent*alcoholCent$  
+
+## Assumptions
+
+### Residual Plots
+```{r}
+data <- data %>% mutate(predicted = predict.lm(final.model))
+data <- data %>% mutate(resid=resid(final.model))
+ggplot(data, aes(predicted, resid)) + geom_point() + 
+  geom_hline(yintercept=0, color="red") + labs(x="Predicted Values", y="Residuals", 
+  title="Residuals vs. Fitted Values") + theme(plot.title=element_text(hjust=0.5, 
+  size=10))
+```
+
+### Normaltiy
+```{r}
+# distribution of residuals
+ggplot(data, aes(resid)) + geom_histogram(color="black", 
+  fill="steelblue2") + labs(x="residuals", y="count", title="Histogram of Residuals") + 
+  theme(plot.title=element_text(hjust=0.5, size=10))
+# QQ Plot
+qqnorm(bikeshare$resid, main="Normal QQ Plot of Residuals")
+qqline(bikeshare$resid, col="red")
+```
+
+The histogram is unimodal and fairly symmetric. In the QQ plot, we can see most of the points lie right on top of the red diagonal line, with some deviation on the sides. Overall, the Normaltiy Assumption is well satisfied.
+
+### Influence Points
+```{r}
+data <- data %>% mutate(leverage = hatvalues(final.model), cooks = 
+  cooks.distance(final.model), stand.resid = rstandard(final.model), obs.num =  
+  row_number())
+```
+
+```{r}
+# calculate leverage threshold
+t <- 2*10/1599
+```
+
+```{r}
+# leverage
+ggplot(data=data, aes(x=obs.num, y=leverage)) + 
+  geom_point(alpha=0.5) + 
+  geom_hline(yintercept=t, color="red") +
+  labs(x="Observation Number", y="Leverage", title="Leverage")
+```
+
+We can see that there is one point with a significantly high leverage around 0.4, comparing with other observations. This could be an outlier and might be an influence point.
+
+```{r}
+data %>% filter(leverage > 0.3) %>% 
+  select(citric.acid, residual.sugarCent, free.sulfur.dioxideCent, sulphatesCent, densityCent, alcoholCent)
+```
+
+```{r}
+# Cook’s Distance
+ggplot(data=data, aes(x=obs.num, y=cooks)) + 
+  geom_point() + 
+  geom_hline(yintercept=1, color="red")+
+  labs(x="Observation Number", y="Cook's Distance", title="Cook's Distance")
+```
+
+The Cook’s Distance for all observations are far below the threshold of 1.
+
+```{r}
+# standardized residuals
+p1 <- ggplot(data=data, aes(x=predicted, y=stand.resid)) + geom_point()+  geom_hline(yintercept=0, color="red")
+p2 <- ggplot(data=data, aes(x=residual.sugarCent, y=stand.resid)) + geom_point()+  geom_hline(yintercept=0, color="red")
+p3 <- ggplot(data=data, aes(x=citric.acid, y=stand.resid)) + geom_point()+  geom_hline(yintercept=0, color="red")
+p4 <- ggplot(data=data, aes(x=free.sulfur.dioxideCent, y=stand.resid)) + geom_point()+  geom_hline(yintercept=0, color="red")
+p5 <- ggplot(data=data, aes(x=sulphatesCent, y=stand.resid)) + geom_point()+  geom_hline(yintercept=0, color="red")
+p6 <- ggplot(data=data, aes(x=densityCent, y=stand.resid)) + geom_point()+  geom_hline(yintercept=0, color="red")
+p7 <- ggplot(data=data, aes(x=alcoholCent, y=stand.resid)) + geom_point()+  geom_hline(yintercept=0, color="red")
+
+plot_grid(p1, p2, p3, p4, p5, p6, p7, ncol=2, nrow=4)
+```
+
+The standardized residuals show some points with magnitude greater than 2, but overall, in combination with our observation from Cook’s Distance and just one data point with high leverage away from other points, we can conclude there isn't any obvious influential points in this model.
+
+<!--citric.acid*free.sulfur.dioxideCent + citric.acid*sulphatesCent + free.sulfur.dioxideCent*alcoholCent + sulphatesCent*alcoholCent-->
+
+### Multicollinearity
+```{r}
+kable(tidy(vif(final.model)))
+```
+
+## Aditional Work
+```{r}
+model_fsd <- lm(quality ~ residual.sugarCent + citric.acid + free.sulfur.dioxideCent + sulphatesCent + densityCent + alcoholCent + free.sulfur.dioxideCent*sulphatesCent + free.sulfur.dioxideCent*densityCent + free.sulfur.dioxideCent*alcoholCent, data=data)
+ano3 <- anova(model_fsd, model)
+kable(tidy(ano3))
+```
+
+```{r}
+model_s <- lm(quality ~ residual.sugarCent + citric.acid + free.sulfur.dioxideCent + sulphatesCent + densityCent + alcoholCent + sulphates*densityCent + sulphatesCent*alcoholCent, data=data)
+ano4 <- anova(model_s, model)
+kable(tidy(ano4))
+```
+
+# check using stepwise
+```{r}
+# stepwise selection
+stepwise_new <- ols_step_both_aic(model1, details=TRUE)
+# view the stepwise AIC backward elimination
+plot(stepwise_new)
+```
+
+<!-- # Bob Logistic Regression
+
+```{r}
+rawdata <- read.csv("./redwine_quality.csv")
+data$quality <- rawdata$quality
+data$quality[data$quality < 6] <- 0
+data$quality[data$quality >= 6] <- 1
+
+# Model Reduced
+modellg1.null <- glm(quality ~ 1, data=data , family=binomial) 
+
+# Model Full
+modellg1.full <- glm(quality ~ volatile.acidityCent  + residual.sugarCent + citric.acid + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + densityCent + pHCent + alcoholCent,data=data, family = binomial)
+```
+
+```{r}
+# forward Selection
+step(modellg1.null,scope=list(upper=modellg1.full),direction="forward")
+```
+
+```{r}
+modellg1.selected <- glm(quality ~ alcoholCent  + volatile.acidityCent + sulphatesCent + chloridesCent + free.sulfur.dioxideCent + citric.acid + pHCent + densityCent,data=data, family = binomial)
+summary(modellg1.selected)
+kable(tidy(modellg1.selected))
+```
+
+```{r}
+modellg1.final <- glm(quality ~ alcoholCent  + volatile.acidityCent + sulphatesCent + chloridesCent + free.sulfur.dioxideCent + citric.acid,data=data, family = binomial)
+summary(modellg1.final)
+kable(tidy(modellg1.final))
+```
+
+```{r}
+kable(tidy(vif(modellg1.final)))
+```
+
+```{r}
+data$pred <- predict.glm(modellg1.final)
+data$res <- residuals.glm(modellg1.final)
+```
+
+```{r,fig.height=4,fig.width=4,echo=F}
+binnedplot(x=data$pred,y=data$res,xlab="Predict")
+binnedplot(x=data$alcoholCent,y=data$res,xlab="alcoholCent")
+binnedplot(x=data$volatile.acidityCent,y=data$res,xlab="volatile.acidityCent")
+binnedplot(x=data$sulphatesCent,y=data$res,xlab="sulphatesCent")
+binnedplot(x=data$chloridesCent,y=data$res,xlab="chloridesCent")
+binnedplot(x=data$free.sulfur.dioxideCent,y=data$res,xlab="free.sulfur.dioxideCent")
+binnedplot(x=data$citric.acid,y=data$res,xlab="citric.acid")
+```
+
+sulfates cent need transformation
+volatile.acidityCent also needs tranformation
+alcoholCent also needs transformation
+
+```{r}
+avPlots(modellg1.final)
+cutoff <- cooks.distance(modellg1.final)
+plot(modellg1.final, which=4, cook.levels=cutoff)
+influencePlot(modellg1.final,	 main="Influence Plot", sub="Circle size is proportial to Cook's Distance" )
+
+data <- data %>%
+  mutate(leverage = hatvalues(modellg1.final), 
+         cooks = cooks.distance(modellg1.final),
+         stand.resid = rstandard(modellg1.final), 
+         obs.num = row_number())
+p3 <- ggplot(data=data, aes(x=obs.num,y=leverage)) + 
+  geom_point(alpha=0.5) + 
+  geom_hline(yintercept=0.1,color="red")+
+  labs(x="Observation Number",y="Leverage",title="Leverage")
+
+p4 <- ggplot(data=data, aes(x=obs.num,y=cooks)) + 
+  geom_point() + 
+  geom_hline(yintercept=1,color="red")+
+  labs(x="Observation Number",y="Cook's Distance",title="Cook's Distance")
+
+plot_grid(p3,p4,ncol = 2)
+```
+
+no significant outlier or influential plot.-->
