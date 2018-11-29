@@ -458,3 +458,29 @@ plot_grid(p3,p4,ncol = 2)
 ```
 
 no significant outlier or influential plot.
+
+## Lynn-Interactions on Logistic Regression
+
+```{r}
+# interaction effects with change in deviance test
+modellg1.final <- glm(quality ~ alcoholCent  + volatile.acidityCent + sulphatesCent + chloridesCent + free.sulfur.dioxideCent + citric.acid,data=data, family = binomial)
+modellg2 <- glm(quality ~ alcoholCent  + volatile.acidityCent + sulphatesCent + chloridesCent + free.sulfur.dioxideCent + citric.acid + alcoholCent*volatile.acidityCent, data=data, family = binomial)
+modellg3 <- glm(quality ~ alcoholCent  + volatile.acidityCent + sulphatesCent + chloridesCent + free.sulfur.dioxideCent + citric.acid + alcoholCent*sulphatesCent, data=data, family = binomial)
+modellg4 <- glm(quality ~ alcoholCent  + volatile.acidityCent + sulphatesCent + chloridesCent + free.sulfur.dioxideCent + citric.acid + volatile.acidityCent*sulphatesCent, data=data, family = binomial)
+tidy(anova(modellg1.final,modellg2,test="Chisq"))
+tidy(anova(modellg1.final,modellg3,test="Chisq"))
+tidy(anova(modellg1.final,modellg4,test="Chisq"))
+```
+Based on the three test, we discover significant interaction between alcoholCent and sulphatesCent, and we are including it in our model.
+
+
+```{r}
+#final logistic regression model
+final.model.lg <- glm(quality ~ alcoholCent  + volatile.acidityCent + sulphatesCent + chloridesCent + free.sulfur.dioxideCent + citric.acid + alcoholCent*sulphatesCent, data=data, family = binomial)
+summary(final.model.lg)
+```
+
+Our final logistic regression model:  
+$quality = 0.539269 + 0.996689*alcoholCent - 3.519343*volatile.acidityCent + 3.367093*sulphatesCent - 2.259180*chloridesCent - 0.014257*free.sulfur.dioxideCent - 0.976473*citric.acid + 1.549278*alcoholCent*sulphatesCent $ 
+
+## Ordinal
