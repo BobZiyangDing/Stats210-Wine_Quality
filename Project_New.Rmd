@@ -378,7 +378,7 @@ stepwise_new <- ols_step_both_aic(model1, details=TRUE)
 plot(stepwise_new)
 ```
 
-<!-- # Bob Logistic Regression
+# Bob Logistic Regression
 
 ```{r}
 rawdata <- read.csv("./redwine_quality.csv")
@@ -457,4 +457,4 @@ p4 <- ggplot(data=data, aes(x=obs.num,y=cooks)) +
 plot_grid(p3,p4,ncol = 2)
 ```
 
-no significant outlier or influential plot.-->
+no significant outlier or influential plot.
