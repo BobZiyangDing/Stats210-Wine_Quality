@@ -87,6 +87,35 @@ plot_grid(p1,p3,p4,p5,p6,p7,p9,p10,p11,p12,ncol = 4,nrow = 3)
 
 We can see that free.sulfur.dioxide and alcohol have an obvious rightly skewed distribution. residual.sugar, cholorides, and sulphates also have a slightly rightward skewedness. citric.acid at first appears to have a bimodal distribution, but this is because there are some wines with zero citric acid, so we see a spike at 0 in the histogram. Based on the data definition, we know it is possible for wines to have citric acid of 0. ***** The distribution of citric acid is overall fairly symmetric. ***** All other variables: quality, volatile.acidity, density, and pH are unimodal and fairly symmetric.
 
+
+```{r}
+# log transform the citric.aci, free.sulfure.dioxide, and alcohol
+# data$citric.acid <- log(15*data$citric.acid+1)
+data$free.sulfur.dioxide<- log(data$free.sulfur.dioxide)
+data$alcohol <- log(data$alcohol)
+```
+
+
+```{r}
+# distribution of each variable
+p1  <- ggplot(data = data, aes(x = quality) ) + geom_histogram(stat="count",fill= "lightblue") 
+p3  <- ggplot(data = data, aes(x = volatile.acidity) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p4  <- ggplot(data = data, aes(x = citric.acid) ) + theme(axis.text=element_text(size=7)) + geom_histogram(fill= "lightblue")
+p5  <- ggplot(data = data, aes(x = residual.sugar) ) + geom_histogram(fill= "lightblue")
+p6  <- ggplot(data = data, aes(x = chlorides) ) + theme(axis.text=element_text(size=11)) + geom_histogram(fill= "lightblue")
+p7  <- ggplot(data = data, aes(x = free.sulfur.dioxide) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p9  <- ggplot(data = data, aes(x = density) ) + theme(axis.text=element_text(size=7.5)) + geom_histogram(fill= "lightblue")
+p10 <- ggplot(data = data, aes(x = pH) ) + geom_histogram(fill= "lightblue")
+p11 <- ggplot(data = data, aes(x = sulphates) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p12 <- ggplot(data = data, aes(x = alcohol) ) + geom_histogram(fill= "lightblue")
+
+plot_grid(p1,p3,p4,p5,p6,p7,p9,p10,p11,p12,ncol = 4,nrow = 3)
+```
+
+Now all is fine.
+
+### **Notice that now citric.acid, free.sulfur.dioxide,and alcohol is logged**
+
 ******sort quality********
 
 ```{r}
