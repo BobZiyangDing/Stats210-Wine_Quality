@@ -500,6 +500,142 @@ summary(final.model.lg)
 Our final logistic regression model:  
 $quality = 0.539269 + 0.996689*alcoholCent - 3.519343*volatile.acidityCent + 3.367093*sulphatesCent - 2.259180*chloridesCent - 0.014257*free.sulfur.dioxideCent - 0.976473*citric.acid + 1.549278*alcoholCent*sulphatesCent $ 
 
-## Ordinal Logistic Regression
+## Lynn-Ordinal Logistic Regression
+Because of the natural ordering of the Y variable, quality, we believe ordinal logistic regression might be a good model to explain the variation of quality.
+### Exploratory analysis
+```{r}
+#reload the data because quality was taken as binary in logistic
+data <- data %>% mutate(quality_dup=quality)
+data$quality_dup <- rawdata$quality
+## create separate indicator variables for each level of quality to use in binned plots
+data <- data %>% mutate(qua0 = if_else(quality_dup=="0",1,0), 
+                            qua1 = if_else(quality_dup=="1",1,0),
+                            qua2 = if_else(quality_dup=="2",1,0),
+                            qua3 = if_else(quality_dup=="3",1,0),
+                            qua4 = if_else(quality_dup=="4",1,0),
+                            qua5 = if_else(quality_dup=="5",1,0),
+                            qua6 = if_else(quality_dup=="6",1,0),
+                            qua7 = if_else(quality_dup=="7",1,0),
+                            qua8 = if_else(quality_dup=="8",1,0),
+                            qua9 = if_else(quality_dup=="9",1,0),
+                            qua10 = if_else(quality_dup=="10",1,0))
+                          
+``` 
+
+### Model
+```{r}
+data <- data %>% mutate(quality_dup=as.factor(quality_dup))
+m1 <- polr(quality_dup ~ volatile.acidityCent + residual.sugarCent + citric.acid + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + densityCent + pHCent + alcoholCent, data=data)
+summary(m1)
+kable(tidy(m1),format="markdown",digits=3)
+``` 
+
+```{r}
+#parameter estimates with confidence level
+confint.default(m1)
+``` 
+If the 95% CI does not cross 0, the parameter estimate is statistically significant. The CI for volatile.acidityCent, citric.acid, chloridesCent, sulphatesCent, pHCent and alcoholCent do not include 0, so we take them as significant and remove residual.sugarCent, free.sulfur.dioxideCent and densityCent from the model.
+
+```{r}
+m2 <- polr(quality_dup ~ volatile.acidityCent + citric.acid + chloridesCent + sulphatesCent + pHCent + alcoholCent, data=data)
+summary(m2)
+confint.default(m2)
+```
+
+```{r}
+#get odds ratios
+exp(coef(m2))
+## OR and CI
+ci <- confint(m2)
+exp(cbind(OR = coef(m2), ci))
+```
+For the interpretation of alcohol, as it is logged.
+
+### Prediction
+```{r}
+# calculate predicted probabilities for each observation
+predprobs <- data.frame(predict(m2,type="probs"))
+predprobs %>% filter(row_number() <= 3) #print predictions for first three observations
+```
+
+```{r}
+# predicted categories
+data <- data %>% mutate(pred.comp = predict(m2,type="class")) # get predicted categories
+result <- data %>% group_by(pred.comp,quality_dup) %>% summarise(n=n()) # summarise actual vs. predicted
+kable(spread(result,quality_dup,n),format="markdown") # print actual vs. predicted categories
+```
+
+### Model Diagnostics
+```{r}
+data <- data %>% mutate(resid3 = qua3-predprobs[,1],
+                            resid4 = qua4-predprobs[,2],
+                            resid5 = qua5-predprobs[,3],
+                            resid6 = qua6-predprobs[,4],
+                            resid7 = qua7-predprobs[,5],
+                            resid8 = qua8-predprobs[,6])
+```
+
+```{r}
+# binned plots of residuals
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid3,xlab="volatile.acidityCent")
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid4,xlab="volatile.acidityCent")
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid5,xlab="volatile.acidityCent")
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid6,xlab="volatile.acidityCent")
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid7,xlab="volatile.acidityCent")
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid8,xlab="volatile.acidityCent")
+```
+
+```{r}
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$citric.acid,y=data$resid3,xlab="citric.acid")
+arm::binnedplot(x=data$citric.acid,y=data$resid4,xlab="citric.acid")
+arm::binnedplot(x=data$citric.acid,y=data$resid5,xlab="citric.acid")
+arm::binnedplot(x=data$citric.acid,y=data$resid6,xlab="citric.acid")
+arm::binnedplot(x=data$citric.acid,y=data$resid7,xlab="citric.acid")
+arm::binnedplot(x=data$citric.acid,y=data$resid8,xlab="citric.acid")
+```
+
+
+```{r}
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$chloridesCent,y=data$resid3,xlab="chloridesCent")
+arm::binnedplot(x=data$chloridesCent,y=data$resid4,xlab="chloridesCent")
+arm::binnedplot(x=data$chloridesCent,y=data$resid5,xlab="chloridesCent")
+arm::binnedplot(x=data$chloridesCent,y=data$resid6,xlab="chloridesCent")
+arm::binnedplot(x=data$chloridesCent,y=data$resid7,xlab="chloridesCent")
+arm::binnedplot(x=data$chloridesCent,y=data$resid8,xlab="chloridesCent")
+```
+*concerning residual patterns here*
+
+```{r}
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$sulphatesCent,y=data$resid3,xlab="sulphatesCent")
+arm::binnedplot(x=data$sulphatesCent,y=data$resid4,xlab="sulphatesCent")
+arm::binnedplot(x=data$sulphatesCent,y=data$resid5,xlab="sulphatesCent")
+arm::binnedplot(x=data$sulphatesCent,y=data$resid6,xlab="sulphatesCent")
+arm::binnedplot(x=data$sulphatesCent,y=data$resid7,xlab="sulphatesCent")
+arm::binnedplot(x=data$sulphatesCent,y=data$resid8,xlab="sulphatesCent")
+```
+
+```{r}
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$pHCent,y=data$resid3,xlab="pHCent")
+arm::binnedplot(x=data$pHCent,y=data$resid4,xlab="pHCent")
+arm::binnedplot(x=data$pHCent,y=data$resid5,xlab="pHCent")
+arm::binnedplot(x=data$pHCent,y=data$resid6,xlab="pHCent")
+arm::binnedplot(x=data$pHCent,y=data$resid7,xlab="pHCent")
+arm::binnedplot(x=data$pHCent,y=data$resid8,xlab="pHCent")
+```
+
+```{r}
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$alcoholCent,y=data$resid3,xlab="alcoholCent")
+arm::binnedplot(x=data$alcoholCent,y=data$resid4,xlab="alcoholCent")
+arm::binnedplot(x=data$alcoholCent,y=data$resid5,xlab="alcoholCent")
+arm::binnedplot(x=data$alcoholCent,y=data$resid6,xlab="alcoholCent")
+arm::binnedplot(x=data$alcoholCent,y=data$resid7,xlab="alcoholCent")
+arm::binnedplot(x=data$alcoholCent,y=data$resid8,xlab="alcoholCent")
+```
 
 
