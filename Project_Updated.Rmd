@@ -19,7 +19,10 @@ library("dplyr")
 library("car")
 library("pROC")
 #library("tibble")
-library(nnet)
+library("nnet")
+library("tidyr")
+library("MASS")
+library("AER")
 ```
 
 # Data Exploration
@@ -35,7 +38,7 @@ data <- data %>% mutate(quality = as.factor(quality))
 
 ```{r}
 # overview of the dataset
-glimpse(data)
+kable(tidy(summary(data)))
 ```
 
 ```{r}
@@ -638,4 +641,7 @@ arm::binnedplot(x=data$alcoholCent,y=data$resid7,xlab="alcoholCent")
 arm::binnedplot(x=data$alcoholCent,y=data$resid8,xlab="alcoholCent")
 ```
 
+```{r}
+coeftest(m2)
+```
 
