@@ -22,6 +22,7 @@ library("pROC")
 library("nnet")
 library("tidyr")
 library("MASS")
+library("caret")
 library("AER")
 ```
 
@@ -576,7 +577,15 @@ data <- data %>% mutate(resid3 = qua3-predprobs[,1],
                             resid6 = qua6-predprobs[,4],
                             resid7 = qua7-predprobs[,5],
                             resid8 = qua8-predprobs[,6])
+data$predor <- predict(m2, data)
 ```
+
+```{r}
+data %>% count(predor,quality_dup)
+confusionMatrix(data$predor,data$quality_dup)
+```
+
+
 
 ```{r}
 # binned plots of residuals
@@ -644,4 +653,6 @@ arm::binnedplot(x=data$alcoholCent,y=data$resid8,xlab="alcoholCent")
 ```{r}
 coeftest(m2)
 ```
+
+
 
