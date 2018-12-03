@@ -563,7 +563,7 @@ kable(tidy(final.model.lg))
 ******************p-value of chloridesCent > 0.05...
 
 Our final logistic regression model:  
-$quality = 0.539269 + 0.996689*alcoholCent - 3.519343*volatile.acidityCent + 3.367093*sulphatesCent - 2.259180*chloridesCent - 0.014257*free.sulfur.dioxideCent - 0.976473*citric.acid + 1.549278*alcoholCent*sulphatesCent$ 
+$\frac{\pi_{good}}{\pi_{bad}} = \exp(0.539269 + 0.996689*alcoholCent - 3.519343*volatile.acidityCent + 3.367093*sulphatesCent - 2.259180*chloridesCent - 0.014257*free.sulfur.dioxideCent - 0.976473*citric.acid + 1.549278*alcoholCent*sulphatesCent)$ 
 
 # Ordinal Logistic Regression
 Because the response variable, quality, is ordinal and has a natural ordering for categories 0,1,...,10, we believe ordinal logistic regression might be a good model.
@@ -765,9 +765,16 @@ arm::binnedplot(x=data$alcoholCent,y=data$resid7,xlab="alcoholCent")
 arm::binnedplot(x=data$alcoholCent,y=data$resid8,xlab="alcoholCent")
 ```
 
+
+
+```{r}
+kable(tidy(vif(final.model)))
+```
+
+
 ```{r}
 # obtain p-values
-coeftest(final.model)
+tidy(coeftest(final.model))
 ```
 
 p-values of all the variables are extremely small, so they are all significant predictors of the log-odds of the wine falling in or below quality j. We should also not extrapolate beyond quality j=3,4,...,7.
