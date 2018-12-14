@@ -565,6 +565,41 @@ kable(tidy(final.model.lg))
 Our final logistic regression model:  
 $\frac{\pi_{good}}{\pi_{bad}} = \exp(0.539269 + 0.996689*alcoholCent - 3.519343*volatile.acidityCent + 3.367093*sulphatesCent - 2.259180*chloridesCent - 0.014257*free.sulfur.dioxideCent - 0.976473*citric.acid + 1.549278*alcoholCent*sulphatesCent)$ 
 
+
+# 
+
+
+```{r}
+x <- data.frame("quality"=data$quality,
+                "alcoholCent"= data$alcoholCent, 
+                "volatile.acidityCent"=data$volatile.acidityCent,
+                "sulphatesCent"=data$sulphatesCent,
+                "chloridesCent"=data$chloridesCent,
+                "free.sulfur.dioxideCent"=data$free.sulfur.dioxideCent,
+                "citric.acid"=data$citric.acid,
+                "alcoholCent:sulphatesCent"=data$alcoholCent*data$sulphatesCent)
+x <- as.matrix(x)
+library("tsne")
+
+datatsne <- tsne(x, k=2, perplexity=50)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Ordinal Logistic Regression
 Because the response variable, quality, is ordinal and has a natural ordering for categories 0,1,...,10, we believe ordinal logistic regression might be a good model.
 
