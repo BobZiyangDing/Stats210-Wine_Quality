@@ -119,7 +119,7 @@ For one unit increase in citric.acid, the odds of the wine falling at or below q
 
 For one unit increase in chlorides, the odds of the wine falling at or below quality i multiply by a factor of 0.005199004, given that all other variables are held constant.
 
-For sulphates multiplied by a factor of 2, the odds of the wine falling at or below quality i multiply by a factor of exp(12.134671385log(2)), given that all other variables are held constant.
+For sulphates doubled, the odds of the wine falling at or below quality i multiply by a factor of 12.134671385log(2), which is 8.411, given that all other variables are held constant.
 
 For one unit increase in pH, the odds of the wine falling at or below quality i multiply by a factor of 0.228196887, given that all other variables are held constant.
 
