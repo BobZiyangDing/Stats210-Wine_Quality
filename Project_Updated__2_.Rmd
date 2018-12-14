@@ -1,0 +1,635 @@
+---
+title: "Project"
+author: "Bob Ding, Lynn Fan, Alice Jiang"
+date: "11/18/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("cowplot")
+library("dplyr")
+library("ggplot2")
+library("broom")
+library("knitr")
+library("readr")
+library("arm")
+library("olsrr")
+library("dplyr")
+library("car")
+library("pROC")
+library("tibble")
+library("nnet")
+library("tidyr")
+library("MASS")
+library("caret")
+library("AER")
+```
+
+# Data Exploration
+```{r}
+# input data source
+data <- read.csv("./redwine_quality.csv")
+```
+
+```{r}
+# overview of the dataset
+glimpse(data)
+```
+
+```{r}
+# convert quality into factor variable
+data <- data %>% mutate(quality = as.factor(quality))
+```
+
+```{r}
+# duplicate quality for ordinal regresison
+data <- data %>% mutate(quality_dup = as.factor(quality))
+```
+
+```{r}
+# scatter plot matrix one
+pairs(quality ~ fixed.acidity + volatile.acidity + citric.acid + density + residual.sugar + chlorides, data=data)
+``` 
+
+The scatter plot matrix suggests a fairly strong positive linear relationship between fixed.acidity and citric.acid; fixed.acidity and density; and density and residual.sugar. There also appears to be a strong negative linear relationship between volatile.acidity and citric.acid. 
+
+```{r}
+# correlation coefficients for potential multicollinearity
+cor(data$fixed.acidity, data$citric.acid)
+cor(data$fixed.acidity, data$density)
+cor(data$volatile.acidity, data$citric.acid)
+cor(data$density, data$residual.sugar)
+```
+
+The correlation coefficent for fixed.acidity and citric.acid (0.6717034) and the correlation coefficient for fixed.acidity and density (0.6680473) show moderate to strong linear relationship between the variables. To remove potential multicollinearity impact, we **will not include fixed.acidity** in the model.
+
+```{r}
+# scatter plot matrix two
+pairs(quality ~ free.sulfur.dioxide + total.sulfur.dioxide + pH + sulphates + alcohol, data=data)
+```
+
+The scatter plot shows strong positive linear relationship between free.sulfur.dioxide and total.sulfur.dioxide.
+
+```{r}
+# correlation coefficients for potential multicollinearity
+cor(data$free.sulfur.dioxide, data$total.sulfur.dioxide)
+```
+
+The correlation coefficient of 0.6676665 between free.sulfur.dioxide and total.sulfur.dioxide indicates strong positive linear relationship. We also know from the data description that total.sulfur dioxide includes free.sulfur.dioxide - whose concentration level could impact the smell and taste of the wine, thus impacting quality. So it is sufficient to include only one of these two variables in the model, and we **will include free.sulphur.dioxide**.
+
+```{r}
+# distribution of each variable
+p1  <- ggplot(data = data, aes(x = quality) ) + geom_histogram(stat="count",fill= "lightblue") 
+p2  <- ggplot(data = data, aes(x = volatile.acidity) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p3  <- ggplot(data = data, aes(x = citric.acid) ) + theme(axis.text=element_text(size=7)) + geom_histogram(fill= "lightblue")
+p4  <- ggplot(data = data, aes(x = residual.sugar) ) + geom_histogram(fill= "lightblue")
+p5  <- ggplot(data = data, aes(x = chlorides) ) + theme(axis.text=element_text(size=11)) + geom_histogram(fill= "lightblue")
+p6  <- ggplot(data = data, aes(x = free.sulfur.dioxide) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p7  <- ggplot(data = data, aes(x = density) ) + theme(axis.text=element_text(size=7.5)) + geom_histogram(fill= "lightblue")
+p8 <- ggplot(data = data, aes(x = pH) ) + geom_histogram(fill= "lightblue")
+p9 <- ggplot(data = data, aes(x = sulphates) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+p10 <- ggplot(data = data, aes(x = alcohol) ) + geom_histogram(fill= "lightblue")
+
+plot_grid(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,ncol=4,nrow=3)
+```
+
+We can see that free.sulfur.dioxide and alcohol have an obvious rightly skewed distribution. residual.sugar, cholorides, and sulphates also have a slightly rightward skewedness. citric.acid appears to have a bimodal distribution; however, it could be due to the fact that some wines are allowed to have zero citric acid, so we see a spike at 0 in the histogram. All other variables: quality, volatile.acidity, density, and pH are unimodal and fairly symmetric. 
+
+```{r}
+# log transform sulphates
+data <- data %>% mutate(log_sulphates = log(sulphates))
+```
+
+```{r}
+# distribution of the log transformed sulphates
+ggplot(data = data, aes(x = log_sulphates) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
+```
+
+```{r}
+# summary statistics of each variable
+summary(data)
+```
+
+From the previous histogram, we can see that quality has a fairly normal distribution. The summary statistic also shows that quality rating of 5 has the most number of observations (it is also the middle rating on the scale of 0-10). So quality rating of 5 is the most appropriate **reference level** for the model.
+
+```{r}
+# makes quality==5 the reference level
+data <- data %>% mutate(quality = relevel(quality, ref=5))
+```
+
+```{r}
+# add mean-centered numerical variables besides citric.acid
+data <- data %>% 
+  mutate(volatile.acidityCent = volatile.acidity-mean(volatile.acidity), 
+         residual.sugarCent = residual.sugar-mean(residual.sugar), 
+         chloridesCent = chlorides-mean(chlorides), 
+         free.sulfur.dioxideCent = free.sulfur.dioxide-mean(free.sulfur.dioxide), 
+         sulphatesCent = sulphates-mean(sulphates)
+         densityCent = density-mean(density), pHCent = pH-mean(pH),   
+         alcoholCent = alcohol-mean(alcohol))
+```
+
+# Logistic Regression
+
+```{r}
+# transform quality into a binary variable
+rawdata <- read.csv("./redwine_quality.csv")
+data$quality <- rawdata$quality
+data$quality[data$quality < 6] <- 0    # any quality less than 6 is 0 (not good)
+data$quality[data$quality >= 6] <- 1   # quality equal to or greater than 6 so 6-10 is 1 (good)
+```
+
+```{r}
+# Model Reduced
+modellg1.null <- glm(quality ~ 1, data=data , family=binomial) 
+
+# Model Full
+modellg1.full <- glm(quality ~ volatile.acidityCent + residual.sugarCent + citric.acid + chloridesCent + free.sulfur.dioxideCent + log_sulphates + densityCent + pHCent + alcoholCent, data=data, family = binomial)
+```
+
+```{r}
+# forward Selection
+step(modellg1.null, scope=list(upper=modellg1.full), direction="forward")
+```
+
+```{r}
+# model based on forward selection
+modellg1.final <- glm(quality ~ alcoholCent + volatile.acidityCent + log_sulphates + chloridesCent + free.sulfur.dioxideCent + citric.acid + pHCent, data=data, family = binomial)
+summary(modellg1.final)
+```
+
+```{r}
+# view coefficients of the selected model - the final model with main effects
+kable(tidy(modellg1.final))
+```
+
+We can see that all the variables have p-values smaller than 0.05, so there is significant evidence that they are important predictors of the log-odds (and therefore odds) of wine quality (good vs. not good). Based on the model, it appears that the percent alcohol content of the wine is the strongest predictor of wine quality. alcoholCent has the largest test statistic magnitude of 13.264325. The positive test statistic value also shows that as the % alcohol content of the wine increases, the logs-odds of good vs. not good wine quality increases. The amount of acetic acid in wine (volatile.acidityCent) and the amount of wine additive (log_sulphates) are also strong predictors.
+
+## Assumptions
+```{r}
+# calculate predicted probabilities
+data$pred <- predict.glm(modellg1.final, type="response")
+# calculate residuals of predicted probabilities
+data$res <- residuals.glm(modellg1.final, type="response")
+```
+
+```{r,fig.height=4,fig.width=4,echo=F}
+# binned residual plots
+binnedplot(x=data$pred,y=data$res,xlab="Predict")
+binnedplot(x=data$alcoholCent,y=data$res,xlab="alcoholCent")
+binnedplot(x=data$volatile.acidityCent,y=data$res,xlab="volatile.acidityCent")
+binnedplot(x=data$log_sulphates,y=data$res,xlab="log_sulphates")
+binnedplot(x=data$chloridesCent,y=data$res,xlab="chloridesCent")
+binnedplot(x=data$free.sulfur.dioxideCent,y=data$res,xlab="free.sulfur.dioxideCent")
+binnedplot(x=data$citric.acid,y=data$res,xlab="citric.acid")
+binnedplot(x=data$pHCent,y=data$res,xlab="pHCent")
+```
+
+Binned residual plots show random pattern and raises no major concerns of violations. The binned residual plot of alcoholCent and free.sulfur.dioxideCent seems to show an outlier on the top left, suggesting high average residuals for that bin. There is an outlier on the binned residual plot of chloridesCent on the far right. We'll identify if they are influence points in the later section. The binned residual plot of log_sulphates is much better than the one with sulphatesCent, so log transformation helps.
+
+```{r}
+# use AV Plot to identify prblematic observations
+avPlots(modellg1.final)
+```
+
+We can see observations 653 is consistently identified in av plots. We might consider removing this point if it is influential.
+
+```{r}
+# influence points
+data <- data %>%
+  mutate(leverage = hatvalues(modellg1.final), 
+         cooks = cooks.distance(modellg1.final),
+         stand.resid = rstandard(modellg1.final), 
+         obs.num = row_number())
+```
+
+```{r}
+# Cook's Distance
+cutoff <- cooks.distance(modellg1.final)
+plot(modellg1.final, which=4, cook.levels=cutoff)
+```
+
+We can see that observations 653, 93, and 724 have noticeably higher Cook's Distance than other observations. However, their Cook's Distance is still below 0.05 and is much smaller than the threshold of 1.
+
+```{r}
+# influence plot
+influencePlot(modellg1.final, main="Influence Plot", sub="Circle size is proportial to Cook's Distance" )
+```
+
+We can see that some observations have high studentized residual value with magnitude greater than 2, but they have very low hat values and acceptable circle size. Observations 259 and 152 have very high leverage (hat values) but are within reasonable studentized residual value and circle size. Observation 653 has high magnitude of studentized residual, but very low leverage and reasonable circle size. Overall, there is no outstanding influence point in the data set, based on considerations of leverage and cook's distance.
+
+```{r}
+# leverage threshold
+threshold <- 0.05
+```
+
+Given we have 1599 observations and the above influence plot, we believe 0.05 is a reasonable threshold for leverage.
+
+```{r}
+# leverage and cook's distance plots
+p1 <- ggplot(data=data, aes(x=obs.num,y=leverage)) + 
+  geom_point(alpha=0.5) + 
+  geom_hline(yintercept=threshold,color="red")+
+  labs(x="Observation Number",y="Leverage",title="Leverage")
+
+p2 <- ggplot(data=data, aes(x=obs.num,y=cooks)) + 
+  geom_point() + 
+  geom_hline(yintercept=1,color="red")+
+  labs(x="Observation Number",y="Cook's Distance",title="Cook's Distance")
+
+plot_grid(p1,p2,ncol = 2)
+```
+
+Overall, there is no significant influence point.
+
+```{r}
+# multicollinearity
+kable(tidy(vif(modellg1.final)))
+```
+
+VIF values are very small, so there is no major concerns of multicollinearity.
+
+```{r}
+# ROC Curve
+ROC.quality <- roc(data$quality, data$pred, plot=T)
+```
+
+```{r}
+# area under the curve
+ROC.quality$auc
+```
+
+From the ROC curve and AUC calculation, we can see the curve is fairly close to the top left corner (area under the curve is close to 1). This shows that the logistic model is able to distinguish between good and not good quality, so this is a pretty good model.
+
+## Interaction Effects in Logistic Regression
+```{r}
+# interaction effects with volatile.acidityCent using change in deviance test
+# the final logistic regression model
+modellg1.final <- glm(quality ~ alcoholCent + volatile.acidityCent + log_sulphates + chloridesCent + free.sulfur.dioxideCent + citric.acid + pHCent, data=data, family = binomial) 
+# new model for two-way interaction effects with volatile.acidityCent
+modellg1 <- glm(quality ~ alcoholCent + volatile.acidityCent + log_sulphates + chloridesCent + free.sulfur.dioxideCent + citric.acid + pHCent + alcoholCent*volatile.acidityCent + volatile.acidityCent*log_sulphates + volatile.acidityCent*chloridesCent + volatile.acidityCent*free.sulfur.dioxideCent + volatile.acidityCent*citric.acid + volatile.acidityCent*pHCent, data=data, family = binomial)
+tidy(anova(modellg1.final, modellg1, test="Chisq"))
+```
+
+p-value is greater than 0.05, so no interaction effects with volatile.acidityCent is a significant predictor.
+
+```{r}
+# interaction effects with citric.acid using change in deviance test
+modellg2 <- glm(quality ~ alcoholCent + volatile.acidityCent + log_sulphates + chloridesCent + free.sulfur.dioxideCent + citric.acid + pHCent + alcoholCent*citric.acid + citric.acid*log_sulphates + citric.acid*chloridesCent + citric.acid*free.sulfur.dioxideCent + pHCent*citric.acid, data=data, family = binomial)
+tidy(anova(modellg1.final, modellg2, test="Chisq"))
+```
+
+p-value is greater than 0.05, so interaction effects with citric.acid are not significant.
+
+```{r}
+# other possible two-way interaction effects
+modellg3 <- glm(quality ~ alcoholCent + volatile.acidityCent + log_sulphates + chloridesCent + free.sulfur.dioxideCent + citric.acid + pHCent + alcoholCent*log_sulphates + alcoholCent*chloridesCent + alcoholCent*free.sulfur.dioxideCent + pHCent*alcoholCent* + log_sulphates*chloridesCent + log_sulphates*free.sulfur.dioxideCent + log_sulphates*pHCent + chloridesCent*free.sulfur.dioxideCent + chloridesCent*pHCent + free.sulfur.dioxideCent*pHCent, data=data, family = binomial)
+tidy(anova(modellg1.final, modellg3, test="Chisq"))
+```
+
+At least one of these two-way interaction effects is a significant predictor of log-odds of good wine vs. not good wine.
+
+```{r}
+# forward Selection
+step(modellg1.null, scope=list(upper=modellg3), direction="forward")
+```
+
+```{r}
+# model based on forward selection
+modellg.selected <- glm(formula = quality ~ alcoholCent + volatile.acidityCent + log_sulphates + chloridesCent + citric.acid + pHCent + free.sulfur.dioxideCent + log_sulphates*chloridesCent + log_sulphates*pHCent + alcoholCent*free.sulfur.dioxideCent + log_sulphates*free.sulfur.dioxideCent + pHCent*free.sulfur.dioxideCent, family = binomial, data = data)
+summary(modellg.selected)
+```
+
+```{r}
+# view the selected model
+kable(tidy(modellg.selected))
+```
+
+p-value of chloridesCent, pHCent, log_sulphates*chloridesCent, and pHCent*free.sulfur.dioxideCent are greater than 0.05. We will try to remove the two interaction effects to see if the model improves. 
+
+```{r}
+# final logistic regression model with interaction effects
+modellg.final <- glm(formula = quality ~ alcoholCent + volatile.acidityCent + log_sulphates + chloridesCent + citric.acid + pHCent + free.sulfur.dioxideCent + log_sulphates*pHCent + alcoholCent*free.sulfur.dioxideCent + log_sulphates*free.sulfur.dioxideCent, family = binomial, data = data)
+summary(modellg.final)
+```
+
+```{r}
+# view the final logistic regression model with interaction effects
+kable(tidy(modellg.final))
+```
+
+Our final logistic regression model:  
+$\frac{\pi_{good}}{\pi_{bad}} = \exp(1.9038764 + 1.0586033*alcoholCent - 3.2766673*volatile.acidityCent + 2.7108316*log_sulphates - 2.5149612*chloridesCent - 0.0439258*free.sulfur.dioxideCent - 1.3546527*citric.acid + 0.9718718*pHCent + 5.1190158*log_sulphates*pHCent + 0.0283340*alcoholCent*free.sulfur.dioxideCent - 0.0822934*log_sulphates*free.sulfur.dioxideCent)$ 
+
+## Assumptions
+```{r}
+# calculate predicted probabilities
+data$pred <- predict.glm(modellg.final, type="response")
+# calculate residuals of predicted probabilities
+data$res <- residuals.glm(modellg.final, type="response")
+```
+
+```{r,fig.height=4,fig.width=4,echo=F}
+# binned residual plots
+binnedplot(x=data$pred,y=data$res,xlab="Predict")
+binnedplot(x=data$alcoholCent,y=data$res,xlab="alcoholCent")
+binnedplot(x=data$volatile.acidityCent,y=data$res,xlab="volatile.acidityCent")
+binnedplot(x=data$log_sulphates,y=data$res,xlab="log_sulphates")
+binnedplot(x=data$chloridesCent,y=data$res,xlab="chloridesCent")
+binnedplot(x=data$free.sulfur.dioxideCent,y=data$res,xlab="free.sulfur.dioxideCent")
+binnedplot(x=data$citric.acid,y=data$res,xlab="citric.acid")
+binnedplot(x=data$pHCent,y=data$res,xlab="pHCent")
+```
+
+Binned residual plots show random pattern. The binned residual plot of alcoholCent seems to have an outlier on the top left and the binned residual plot of chloridesCent has an outlier on the far right. Overall, however, there is no major concerns of violations of assumptions.
+
+```{r}
+# use AV Plot to identify problematic observations
+avPlots(modellg.final)
+```
+
+We can see observations 653 and 1435 are consistently identified in av plots. We might consider removing these points if they are influential.
+
+```{r}
+# influence points
+data <- data %>%
+  mutate(leverage = hatvalues(modellg.final), 
+         cooks = cooks.distance(modellg.final),
+         stand.resid = rstandard(modellg.final), 
+         obs.num = row_number())
+```
+
+```{r}
+# Cook's Distance
+cutoff <- cooks.distance(modellg.final)
+plot(modellg.final, which=4, cook.levels=cutoff)
+```
+
+We can see that observations 653 and 1435 have noticeably higher Cook's Distance than other observations. However, their Cook's Distance is still below 0.05 and is much smaller than the threshold of 1.
+
+```{r}
+# influence plot
+influencePlot(modellg1.final, main="Influence Plot", sub="Circle size is proportial to Cook's Distance" )
+```
+
+We can see that some observations have high studentized residual value with magnitude greater than 2, but they have very low hat values and acceptable circle size. Observations 259 and 152 have very high leverage (hat values) but are within reasonable studentized residual value and circle size. Observation 653 has high magnitude of studentized residual, but very low leverage and reasonable circle size. Overall, there is no outstanding influence point in the data set, based on considerations of leverage and cook's distance.
+
+```{r}
+# leverage threshold
+threshold <- 0.05
+```
+
+Given we have 1599 observations and the above influence plot, we believe 0.05 is a reasonable threshold for leverage.
+
+```{r}
+# leverage and cook's distance plots
+p1 <- ggplot(data=data, aes(x=obs.num,y=leverage)) + 
+  geom_point(alpha=0.5) + 
+  geom_hline(yintercept=threshold,color="red")+
+  labs(x="Observation Number",y="Leverage",title="Leverage")
+
+p2 <- ggplot(data=data, aes(x=obs.num,y=cooks)) + 
+  geom_point() + 
+  geom_hline(yintercept=1,color="red")+
+  labs(x="Observation Number",y="Cook's Distance",title="Cook's Distance")
+
+plot_grid(p1,p2,ncol = 2)
+```
+
+Overall, there is no significant influence point.
+
+```{r}
+# multicollinearity
+kable(tidy(vif(modellg.final)))
+```
+
+VIF values are small, so there is no major concerns of multicollinearity.
+
+```{r}
+# ROC Curve
+ROC.quality <- roc(data$quality, data$pred, plot=T)
+```
+
+```{r}
+# area under the curve
+ROC.quality$auc
+```
+
+From the ROC curve and AUC calculation, we can see the curve is fairly close to the top left corner (area under the curve is close to 1). This shows that the logistic model is able to distinguish between good and not good quality, so this is a pretty good model.
+
+
+# Ordinal Logistic Regression
+Because the response variable, quality, is ordinal and has a natural ordering for categories 0,1,...,10, we believe ordinal logistic regression might be a good model.
+
+```{r}
+# create separate indicator variables for each level of quality to use in binned plots
+data <- data %>% mutate(qua0 = if_else(quality_dup=="0",1,0), 
+                        qua1 = if_else(quality_dup=="1",1,0),
+                        qua2 = if_else(quality_dup=="2",1,0),
+                        qua3 = if_else(quality_dup=="3",1,0),
+                        qua4 = if_else(quality_dup=="4",1,0),
+                        qua5 = if_else(quality_dup=="5",1,0),
+                        qua6 = if_else(quality_dup=="6",1,0),
+                        qua7 = if_else(quality_dup=="7",1,0),
+                        qua8 = if_else(quality_dup=="8",1,0),                            
+                        qua9 = if_else(quality_dup=="9",1,0),
+                        qua10 = if_else(quality_dup=="10",1,0))
+                          
+``` 
+
+```{r}
+# full model
+full.model <- polr(quality_dup ~ volatile.acidityCent + residual.sugarCent + citric.acid + chloridesCent + free.sulfur.dioxideCent + sulphatesCent + densityCent + pHCent + alcoholCent, data=data)
+summary(full.model)
+```
+
+```{r}
+# view the model
+kable(tidy(full.model),format="markdown",digits=3)
+``` 
+
+We see there are 5 possible intercepts/models. We also observe the magnitude of the test statistic for densityCent is significantly higher than the test statistic magnitude of other variables.
+
+```{r}
+# parameter estimates with confidence level
+confint.default(full.model)
+``` 
+
+If the 95% CI does not cross 0, the parameter estimate is statistically significant. The CI for volatile.acidityCent, citric.acid, chloridesCent, sulphatesCent, densityCent, pHCent and alcoholCent do not include 0, so we take them as significant and remove residual.sugarCent and free.sulfur.dioxideCent from the model.
+
+```{r}
+# new model
+model <- polr(quality_dup ~ volatile.acidityCent + citric.acid + chloridesCent + sulphatesCent + pHCent + densityCent + alcoholCent, data=data)
+summary(model)
+```
+
+```{r}
+# confidence interval test of the new model
+confint.default(model)
+```
+
+densityCent contains zero in its 95% CI.
+
+```{r}
+# new model without densityCent
+final.model <- polr(quality_dup ~ volatile.acidityCent + citric.acid + chloridesCent + sulphatesCent + pHCent + alcoholCent, data=data)
+summary(final.model)
+```
+
+```{r}
+# confidence interval test
+confint.default(final.model)
+```
+
+We will use this as the final ordianl logistic regression model.
+
+```{r}
+# view the final model
+kable(tidy(final.model))
+```
+
+$log(\frac{P(quality\leq3)}{P(quality>3)})=-6.0844790-[-3.5986801*volatile.acidityCent - 0.7397748*citric.acid - 5.2592883*chloridesCent + 2.7344891*sulphatesCent	- 1.4775465*pHCent + 0.9493381*alcoholCent]$
+$log(\frac{P(quality\leq4)}{P(quality>4)})=-4.1434489-[-3.5986801*volatile.acidityCent - 0.7397748*citric.acid - 5.2592883*chloridesCent + 2.7344891*sulphatesCent	- 1.4775465*pHCent + 0.9493381*alcoholCent]$
+$log(\frac{P(quality\leq5)}{P(quality>5)})=-0.4952119-[-3.5986801*volatile.acidityCent - 0.7397748*citric.acid - 5.2592883*chloridesCent + 2.7344891*sulphatesCent	- 1.4775465*pHCent + 0.9493381*alcoholCent]$
+$log(\frac{P(quality\leq6)}{P(quality>6)})=2.3184245-[-3.5986801*volatile.acidityCent - 0.7397748*citric.acid - 5.2592883*chloridesCent + 2.7344891*sulphatesCent	- 1.4775465*pHCent + 0.9493381*alcoholCent]$
+$log(\frac{P(quality\leq7)}{P(quality>7)})=5.3309018-[-3.5986801*volatile.acidityCent - 0.7397748*citric.acid - 5.2592883*chloridesCent + 2.7344891*sulphatesCent	- 1.4775465*pHCent + 0.9493381*alcoholCent]$
+
+```{r}
+# get CI
+ci <- confint(final.model)
+```
+
+```{r}
+# display odds ratio and CI
+exp(cbind(OR = coef(final.model), ci))
+```
+
+For one unit increase in volatile.acidity, the odds of the wine falling at or below quality i multiply by a factor of 0.027359812, given that all other variables are held constant.
+
+For one unit increase in citric.acid, the odds of the wine falling at or below quality i multiply by a factor of 0.477221357, given that all other variables are held constant.
+
+For one unit increase in chlorides, the odds of the wine falling at or below quality i multiply by a factor of 0.005199004, given that all other variables are held constant.
+
+For one unit increase in sulphates, the odds of the wine falling at or below quality i multiply by a factor of 15.401872706, given that all other variables are held constant.
+
+For one unit increase in pH, the odds of the wine falling at or below quality i multiply by a factor of 0.228196887, given that all other variables are held constant.
+
+For one unit increase in % alcohol content, the odds of the wine falling at or below quality i multiply by a factor of 2.583998874, given that all other variables are held constant.
+
+### Assumptions
+```{r}
+# calculate predicted probabilities for each observation
+predprobs <- data.frame(predict(final.model,type="probs"))
+predprobs %>% filter(row_number() <= 3) # print predictions for first three observations
+```
+
+```{r}
+# predicted categories
+data <- data %>% mutate(pred.comp = predict(final.model,type="class")) # get predicted categories
+result <- data %>% group_by(pred.comp,quality_dup) %>% summarise(n=n()) # summarise actual vs. predicted
+kable(spread(result,quality_dup,n),format="markdown") # print actual vs. predicted categories
+```
+
+### Model Diagnostics
+```{r}
+data <- data %>% mutate(resid3 = qua3-predprobs[,1],
+                        resid4 = qua4-predprobs[,2],
+                        resid5 = qua5-predprobs[,3],
+                        resid6 = qua6-predprobs[,4],
+                        resid7 = qua7-predprobs[,5],
+                        resid8 = qua8-predprobs[,6])
+data$predor <- predict(final.model, data)
+```
+
+```{r}
+data %>% count(predor,quality_dup)
+confusionMatrix(data$predor,data$quality_dup)
+```
+
+```{r}
+# binned residual plots of volatile.acidityCent for each category of quality
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid3,xlab="volatile.acidityCent")
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid4,xlab="volatile.acidityCent")
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid5,xlab="volatile.acidityCent")
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid6,xlab="volatile.acidityCent")
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid7,xlab="volatile.acidityCent")
+arm::binnedplot(x=data$volatile.acidityCent,y=data$resid8,xlab="volatile.acidityCent")
+```
+
+```{r}
+# binned residual plots of citric.acid for each category of quality
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$citric.acid,y=data$resid3,xlab="citric.acid")
+arm::binnedplot(x=data$citric.acid,y=data$resid4,xlab="citric.acid")
+arm::binnedplot(x=data$citric.acid,y=data$resid5,xlab="citric.acid")
+arm::binnedplot(x=data$citric.acid,y=data$resid6,xlab="citric.acid")
+arm::binnedplot(x=data$citric.acid,y=data$resid7,xlab="citric.acid")
+arm::binnedplot(x=data$citric.acid,y=data$resid8,xlab="citric.acid")
+```
+
+```{r}
+# binned residual plots of chloridesCent for each category of quality
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$chloridesCent,y=data$resid3,xlab="chloridesCent")
+arm::binnedplot(x=data$chloridesCent,y=data$resid4,xlab="chloridesCent")
+arm::binnedplot(x=data$chloridesCent,y=data$resid5,xlab="chloridesCent")
+arm::binnedplot(x=data$chloridesCent,y=data$resid6,xlab="chloridesCent")
+arm::binnedplot(x=data$chloridesCent,y=data$resid7,xlab="chloridesCent")
+arm::binnedplot(x=data$chloridesCent,y=data$resid8,xlab="chloridesCent")
+```
+
+The binned residual plots show a possible chloridesCent outlier.
+
+```{r}
+# binned residual plots of sulphatesCent for each category of quality
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$sulphatesCent,y=data$resid3,xlab="sulphatesCent")
+arm::binnedplot(x=data$sulphatesCent,y=data$resid4,xlab="sulphatesCent")
+arm::binnedplot(x=data$sulphatesCent,y=data$resid5,xlab="sulphatesCent")
+arm::binnedplot(x=data$sulphatesCent,y=data$resid6,xlab="sulphatesCent")
+arm::binnedplot(x=data$sulphatesCent,y=data$resid7,xlab="sulphatesCent")
+arm::binnedplot(x=data$sulphatesCent,y=data$resid8,xlab="sulphatesCent")
+```
+
+The binned residual plot shows some potential linear trend and outliers in three categories of quality. We might need to transform sulphatesCent.
+
+```{r}
+# binned residual plots of pHCent for each category of quality
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$pHCent,y=data$resid3,xlab="pHCent")
+arm::binnedplot(x=data$pHCent,y=data$resid4,xlab="pHCent")
+arm::binnedplot(x=data$pHCent,y=data$resid5,xlab="pHCent")
+arm::binnedplot(x=data$pHCent,y=data$resid6,xlab="pHCent")
+arm::binnedplot(x=data$pHCent,y=data$resid7,xlab="pHCent")
+arm::binnedplot(x=data$pHCent,y=data$resid8,xlab="pHCent")
+```
+
+There is also some linear trends in the binned residual plots for pHCent. We should also tranform this variable.
+
+```{r}
+# binned residual plots of alcohol.Cent for each category of quality
+par(mfrow=c(2,3))
+arm::binnedplot(x=data$alcoholCent,y=data$resid3,xlab="alcoholCent")
+arm::binnedplot(x=data$alcoholCent,y=data$resid4,xlab="alcoholCent")
+arm::binnedplot(x=data$alcoholCent,y=data$resid5,xlab="alcoholCent")
+arm::binnedplot(x=data$alcoholCent,y=data$resid6,xlab="alcoholCent")
+arm::binnedplot(x=data$alcoholCent,y=data$resid7,xlab="alcoholCent")
+arm::binnedplot(x=data$alcoholCent,y=data$resid8,xlab="alcoholCent")
+```
+
+
+
+```{r}
+kable(tidy(vif(final.model)))
+```
+
+
+```{r}
+# obtain p-values
+tidy(coeftest(final.model))
+```
+
+p-values of all the variables are extremely small, so they are all significant predictors of the log-odds of the wine falling in or below quality j. We should also not extrapolate beyond quality j=3,4,...,7.
+
