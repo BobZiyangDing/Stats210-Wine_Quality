@@ -581,10 +581,10 @@ x <- data.frame("quality"=data$quality,
 x <- as.matrix(x)
 library("tsne")
 
-datatsne <- tsne(x,max_iter=200,  k=2, perplexity=50)
+datatsne <- tsne(x,max_iter=500,  k=2, perplexity=50)
 datatsne <- data.frame(datatsne)
-datatsne
-ggplot(data=datatsne, aes(x=X1,X2))+geom_point(fill=data$quality)
+datatsne$quality <- as.factor(data$quality)
+ggplot(data=datatsne, aes(x=X1,y=X2,color=quality))+geom_point()
 
 ```
 

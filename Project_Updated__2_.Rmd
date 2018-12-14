@@ -24,6 +24,7 @@ library("tidyr")
 library("MASS")
 library("caret")
 library("AER")
+library("tsne")
 ```
 
 # Data Exploration
@@ -125,7 +126,7 @@ data <- data %>%
          residual.sugarCent = residual.sugar-mean(residual.sugar), 
          chloridesCent = chlorides-mean(chlorides), 
          free.sulfur.dioxideCent = free.sulfur.dioxide-mean(free.sulfur.dioxide), 
-         sulphatesCent = sulphates-mean(sulphates)
+         sulphatesCent = sulphates-mean(sulphates),
          densityCent = density-mean(density), pHCent = pH-mean(pH),   
          alcoholCent = alcohol-mean(alcohol))
 ```
@@ -346,7 +347,7 @@ Binned residual plots show random pattern. The binned residual plot of alcoholCe
 
 ```{r}
 # use AV Plot to identify problematic observations
-avPlots(modellg.final)
+# avPlots(modellg.final)
 ```
 
 We can see observations 653 and 1435 are consistently identified in av plots. We might consider removing these points if they are influential.
@@ -417,6 +418,26 @@ ROC.quality$auc
 ```
 
 From the ROC curve and AUC calculation, we can see the curve is fairly close to the top left corner (area under the curve is close to 1). This shows that the logistic model is able to distinguish between good and not good quality, so this is a pretty good model.
+
+
+```{r}
+x <- data.frame("quality"=data$quality,
+                "alcoholCent"= data$alcoholCent, 
+                "volatile.acidityCent"=data$volatile.acidityCent,
+                "sulphatesCent"=data$sulphatesCent,
+                "chloridesCent"=data$chloridesCent,
+                "free.sulfur.dioxideCent"=data$free.sulfur.dioxideCent,
+                "citric.acid"=data$citric.acid,
+                "alcoholCent:sulphatesCent"=data$alcoholCent*data$sulphatesCent)
+x <- as.matrix(x)
+library("tsne")
+
+datatsne <- tsne(x,max_iter=500,  k=2, perplexity=50)
+datatsne <- data.frame(datatsne)
+datatsne$quality <- as.factor(data$quality)
+ggplot(data=datatsne, aes(x=X1,y=X2,color=quality))+geom_point()
+
+```
 
 
 # Ordinal Logistic Regression
@@ -632,4 +653,22 @@ tidy(coeftest(final.model))
 ```
 
 p-values of all the variables are extremely small, so they are all significant predictors of the log-odds of the wine falling in or below quality j. We should also not extrapolate beyond quality j=3,4,...,7.
+
+```{r}
+x2 <- data.frame("quality"=as.numeric(data$quality_dup),
+                "alcoholCent"= as.numeric(data$alcoholCent), 
+                "volatile.acidityCent"= as.numeric(data$volatile.acidityCent),
+                "sulphatesCent"= as.numeric(data$sulphatesCent),
+                "chloridesCent"= as.numeric(data$chloridesCent),
+                "citric.acid"= as.numeric(data$citric.acid),
+                "pHCent"= as.numeric(data$pHCent) ) 
+
+x2 <- as.matrix(x2)
+
+datatsne2 <- tsne(x2,max_iter=500,  k=2, perplexity=50)
+datatsne2 <- data.frame(datatsne2)
+datatsne2$quality <- as.factor(data$quality_dup)
+ggplot(data=datatsne2, aes(x=X1,y=X2,color=quality))+geom_point()
+
+```
 
