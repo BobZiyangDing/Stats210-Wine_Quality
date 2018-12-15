@@ -93,6 +93,8 @@ p9 <- ggplot(data = data, aes(x = sulphates) ) + theme(axis.text=element_text(si
 p10 <- ggplot(data = data, aes(x = alcohol) ) + geom_histogram(fill= "lightblue")
 
 plot_grid(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,ncol=4,nrow=3)
+
+ggplot(data = data, aes(x = log(sulphates)) ) + theme(axis.text=element_text(size=9)) + geom_histogram(fill= "lightblue")
 ```
 
 We can see that free.sulfur.dioxide and alcohol have an obvious rightly skewed distribution. residual.sugar, cholorides, and sulphates also have a slightly rightward skewedness. citric.acid appears to have a bimodal distribution; however, it could be due to the fact that some wines are allowed to have zero citric acid, so we see a spike at 0 in the histogram. All other variables: quality, volatile.acidity, density, and pH are unimodal and fairly symmetric. 
